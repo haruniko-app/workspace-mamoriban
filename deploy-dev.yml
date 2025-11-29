@@ -1,0 +1,54 @@
+# ==============================================
+# Workspace守り番 - 開発環境デプロイ
+# ==============================================
+# developブランチへのプッシュ時に自動デプロイ
+
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Apps Script (Dev)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup clasp credentials
+        run: |
+          echo '${{ secrets.CLASP_CREDENTIALS }}' > ~/.clasprc.json
+      
+      - name: Setup clasp project config
+        run: |
+          cd apps-script
+          echo '${{ secrets.CLASP_CONFIG_DEV }}' > .clasp.json
+      
+      - name: Push to Apps Script
+        run: npm run push
+      
+      - name: Deploy with description
+        run: |
+          cd apps-script
+          clasp deploy -d "Dev: $(date +%Y-%m-%d) commit:${GITHUB_SHA::7}"
+      
+      - name: Output deployment info
+        run: |
+          echo "✅ Deployment completed!"
+          echo "Commit: ${GITHUB_SHA::7}"
+          echo "Branch: develop"
+          echo "Time: $(date)"
