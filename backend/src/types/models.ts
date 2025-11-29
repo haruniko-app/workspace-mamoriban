@@ -71,14 +71,52 @@ export interface Scan {
   createdAt: Date;
 }
 
+// スキャンされたファイル（scans/{scanId}/files サブコレクション）
+export interface ScannedFile {
+  id: string;                      // Google Drive file ID
+  scanId: string;
+
+  // ファイル情報
+  name: string;
+  mimeType: string;
+  webViewLink: string | null;
+  iconLink: string | null;
+  createdTime: string | null;
+  modifiedTime: string | null;
+  size: string | null;
+
+  // 所有者情報
+  ownerEmail: string;
+  ownerName: string;
+
+  // 共有状態
+  shared: boolean;
+  permissions: {
+    id: string;
+    type: 'user' | 'group' | 'domain' | 'anyone';
+    role: 'owner' | 'organizer' | 'fileOrganizer' | 'writer' | 'commenter' | 'reader';
+    emailAddress: string | null;
+    domain: string | null;
+    displayName: string | null;
+  }[];
+
+  // リスク評価
+  riskScore: number;               // 0-100
+  riskLevel: 'critical' | 'high' | 'medium' | 'low';
+  riskFactors: string[];           // ['外部公開', 'リンク共有', etc.]
+  recommendations: string[];       // ['リンク共有を無効にする', etc.]
+
+  createdAt: Date;
+}
+
 // プラン定義
 export const PLANS = {
   free: {
     name: '無料プラン',
     price: 0,
     maxUsers: 5,
-    maxFilesPerScan: 1000,
-    scansPerMonth: 2,
+    maxFilesPerScan: 100000,  // 開発用に一時的に緩和（本番では1000）
+    scansPerMonth: 100,       // 開発用に一時的に緩和（本番では2）
     features: ['基本スキャン', 'リスクスコア表示'],
   },
   basic: {

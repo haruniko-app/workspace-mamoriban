@@ -22,6 +22,7 @@ out/
 service-account-key.json
 *-service-account.json
 credentials.json
+client_secret_*.json
 
 # IDE
 .idea/

@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+:root {
+  /* Google Workspace Color Palette */
+  --google-blue: #1a73e8;
+  --google-blue-hover: #1557b0;
+  --google-red: #d93025;
+  --google-yellow: #f9ab00;
+  --google-green: #1e8e3e;
+  --google-grey-50: #f8f9fa;
+  --google-grey-100: #f1f3f4;
+  --google-grey-200: #e8eaed;
+  --google-grey-300: #dadce0;
+  --google-grey-500: #9aa0a6;
+  --google-grey-700: #5f6368;
+  --google-grey-900: #202124;
+}
+
 body {
-  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Google Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--google-grey-900);
+  background-color: var(--google-grey-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Google Workspace Button Styles */
+.btn-google-primary {
+  @apply inline-flex items-center justify-center gap-2 bg-[#1a73e8] text-white px-6 py-2.5 rounded-md font-medium text-sm hover:bg-[#1557b0] hover:shadow-md transition-all active:bg-[#174ea6];
+}
+
+.btn-google-secondary {
+  @apply inline-flex items-center justify-center gap-2 bg-white text-[#1a73e8] px-6 py-2.5 rounded-md font-medium text-sm border border-[#dadce0] hover:bg-[#f8f9fa] hover:border-[#1a73e8] transition-all;
+}
+
+/* Google Card Style */
+.card-google {
+  @apply bg-white rounded-lg border border-[#dadce0] shadow-sm;
+}
+
+/* Google Workspace scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #dadce0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9aa0a6;
 }

@@ -5,6 +5,13 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import dotenv from 'dotenv';
 
+// Routes
+import authRoutes from './routes/auth.js';
+import scanRoutes from './routes/scan.js';
+import organizationRoutes from './routes/organization.js';
+import stripeRoutes from './routes/stripe.js';
+import auditLogRoutes from './routes/auditLogs.js';
+
 dotenv.config();
 
 const app = express();
@@ -16,6 +23,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
+
+// Stripe Webhook needs raw body (must be before express.json())
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(session({
@@ -42,11 +53,21 @@ app.get('/api', (req, res) => {
   });
 });
 
-// TODO: Add routes
-// app.use('/api/auth', authRoutes);
-// app.use('/api/scan', scanRoutes);
-// app.use('/api/reports', reportRoutes);
-// app.use('/api/stripe', stripeRoutes);
+// Auth routes
+app.use('/api/auth', authRoutes);
+
+// Scan routes
+app.use('/api/scan', scanRoutes);
+
+// Organization routes
+app.use('/api/organization', organizationRoutes);
+
+// Stripe routes (Webhook needs raw body, so we handle it specially)
+// For webhook, use express.raw() middleware in the route itself
+app.use('/api/stripe', stripeRoutes);
+
+// Audit log routes
+app.use('/api/audit-logs', auditLogRoutes);
 
 app.listen(PORT, () => {
   console.log(`🛡️ Workspace守り番 Backend running on port ${PORT}`);

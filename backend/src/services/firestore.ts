@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import type { Organization, User, Scan } from '../types/models.js';
+import type { Organization, User, Scan, ScannedFile } from '../types/models.js';
 
 // Firestore初期化
 const firestore = new Firestore({
@@ -141,6 +141,17 @@ export const UserService = {
     }
     return this.create(data);
   },
+
+  async updateRole(id: string, role: 'owner' | 'admin' | 'member'): Promise<void> {
+    await usersRef.doc(id).update({
+      role,
+      updatedAt: new Date(),
+    });
+  },
+
+  async delete(id: string): Promise<void> {
+    await usersRef.doc(id).delete();
+  },
 };
 
 /**
@@ -198,6 +209,153 @@ export const ScanService = {
       errorMessage,
       completedAt: new Date(),
     });
+  },
+};
+
+/**
+ * スキャンファイル関連の操作
+ */
+export const ScannedFileService = {
+  /**
+   * ファイルをバッチで保存（サブコレクション）
+   */
+  async saveBatch(scanId: string, files: Omit<ScannedFile, 'scanId' | 'createdAt'>[]): Promise<void> {
+    const batch = firestore.batch();
+    const filesRef = scansRef.doc(scanId).collection('files');
+    const now = new Date();
+
+    for (const file of files) {
+      const docRef = filesRef.doc(file.id);
+      batch.set(docRef, {
+        ...file,
+        scanId,
+        createdAt: now,
+      });
+    }
+
+    await batch.commit();
+  },
+
+  /**
+   * リスクレベルでフィルタリングしてファイル一覧を取得
+   */
+  async getByRiskLevel(
+    scanId: string,
+    riskLevel?: 'critical' | 'high' | 'medium' | 'low',
+    limit = 50,
+    startAfterScore?: number
+  ): Promise<ScannedFile[]> {
+    const filesRef = scansRef.doc(scanId).collection('files');
+
+    let query = filesRef.orderBy('riskScore', 'desc').limit(limit);
+
+    if (riskLevel) {
+      query = query.where('riskLevel', '==', riskLevel);
+    }
+
+    if (startAfterScore !== undefined) {
+      query = query.startAfter(startAfterScore);
+    }
+
+    const snapshot = await query.get();
+    return snapshot.docs.map((doc) => doc.data() as ScannedFile);
+  },
+
+  /**
+   * スキャンの全ファイルを取得（ページネーション）
+   */
+  async getAll(
+    scanId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      riskLevel?: 'critical' | 'high' | 'medium' | 'low';
+      sortBy?: 'riskScore' | 'name' | 'modifiedTime';
+      sortOrder?: 'asc' | 'desc';
+    } = {}
+  ): Promise<{ files: ScannedFile[]; total: number }> {
+    const { limit = 20, offset = 0, riskLevel, sortBy = 'riskScore', sortOrder = 'desc' } = options;
+    const filesRef = scansRef.doc(scanId).collection('files');
+
+    // カウント用クエリ
+    let countQuery: FirebaseFirestore.Query = filesRef;
+    if (riskLevel) {
+      countQuery = countQuery.where('riskLevel', '==', riskLevel);
+    }
+    const countSnapshot = await countQuery.count().get();
+    const total = countSnapshot.data().count;
+
+    // 0件の場合は早期リターン
+    if (total === 0) {
+      return { files: [], total: 0 };
+    }
+
+    // データ取得用クエリ
+    // Note: Firestoreで where + orderBy を使う場合、複合インデックスが必要
+    // riskLevelでフィルター時はソートなしで取得し、メモリ上でソート
+    let dataQuery: FirebaseFirestore.Query = filesRef;
+    if (riskLevel) {
+      dataQuery = dataQuery.where('riskLevel', '==', riskLevel);
+    } else {
+      dataQuery = dataQuery.orderBy(sortBy, sortOrder);
+    }
+
+    // riskLevelフィルター時はページネーションを手動で行う
+    if (riskLevel) {
+      // 全件取得してメモリ上でソート・ページネーション
+      const allDocs = await dataQuery.get();
+      let allFiles = allDocs.docs.map((doc) => doc.data() as ScannedFile);
+
+      // ソート
+      allFiles.sort((a, b) => {
+        const aVal = a[sortBy as keyof ScannedFile] as string | number;
+        const bVal = b[sortBy as keyof ScannedFile] as string | number;
+        if (sortOrder === 'desc') {
+          return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+        }
+        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      });
+
+      // ページネーション
+      const files = allFiles.slice(offset, offset + limit);
+      return { files, total };
+    }
+
+    dataQuery = dataQuery.offset(offset).limit(limit);
+    const snapshot = await dataQuery.get();
+    const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+
+    return { files, total };
+  },
+
+  /**
+   * 特定のファイルを取得
+   */
+  async getById(scanId: string, fileId: string): Promise<ScannedFile | null> {
+    const doc = await scansRef.doc(scanId).collection('files').doc(fileId).get();
+    if (!doc.exists) return null;
+    return doc.data() as ScannedFile;
+  },
+
+  /**
+   * スキャンのファイル数をカウント
+   */
+  async countByRiskLevel(scanId: string): Promise<Record<string, number>> {
+    const filesRef = scansRef.doc(scanId).collection('files');
+
+    const [critical, high, medium, low] = await Promise.all([
+      filesRef.where('riskLevel', '==', 'critical').count().get(),
+      filesRef.where('riskLevel', '==', 'high').count().get(),
+      filesRef.where('riskLevel', '==', 'medium').count().get(),
+      filesRef.where('riskLevel', '==', 'low').count().get(),
+    ]);
+
+    return {
+      critical: critical.data().count,
+      high: high.data().count,
+      medium: medium.data().count,
+      low: low.data().count,
+    };
   },
 };
 

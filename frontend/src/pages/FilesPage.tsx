@@ -1,0 +1,406 @@
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { scanApi, type ScannedFile } from '../lib/api';
+import { Layout } from '../components/Layout';
+
+type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
+
+const RISK_LEVEL_CONFIG: Record<RiskLevel, { label: string; color: string; bgColor: string; borderColor: string }> = {
+  critical: { label: '緊急', color: 'text-[#c5221f]', bgColor: 'bg-[#fce8e6]', borderColor: 'border-[#c5221f]' },
+  high: { label: '高', color: 'text-[#e37400]', bgColor: 'bg-[#fef7e0]', borderColor: 'border-[#e37400]' },
+  medium: { label: '中', color: 'text-[#f9ab00]', bgColor: 'bg-[#fef7e0]', borderColor: 'border-[#f9ab00]' },
+  low: { label: '低', color: 'text-[#137333]', bgColor: 'bg-[#e6f4ea]', borderColor: 'border-[#137333]' },
+};
+
+function FileDetailModal({ file, onClose }: { file: ScannedFile; onClose: () => void }) {
+  const config = RISK_LEVEL_CONFIG[file.riskLevel];
+
+  // Google Drive共有設定URLを生成
+  const getShareUrl = (fileId: string) => {
+    return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[600px] md:max-h-[80vh] bg-white rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#dadce0]">
+          <div className="flex items-center gap-3">
+            {file.iconLink ? (
+              <img src={file.iconLink} alt="" className="w-8 h-8" />
+            ) : (
+              <div className="w-8 h-8 bg-[#f1f3f4] rounded flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                </svg>
+              </div>
+            )}
+            <div>
+              <h2 className="text-lg font-medium text-[#202124] line-clamp-1">{file.name}</h2>
+              <p className="text-sm text-[#5f6368]">{file.ownerName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-[#f1f3f4] transition-colors"
+          >
+            <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Risk Score */}
+          <div className={`${config.bgColor} rounded-xl p-4`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-sm font-medium ${config.color}`}>リスクスコア</span>
+              <span className={`text-2xl font-bold ${config.color}`}>{file.riskScore}点</span>
+            </div>
+            <div className="h-2 bg-white/50 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${config.borderColor.replace('border', 'bg')}`}
+                style={{ width: `${file.riskScore}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Risk Factors */}
+          {file.riskFactors.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-[#202124] mb-3">検出されたリスク</h3>
+              <div className="space-y-2">
+                {file.riskFactors.map((factor, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-[#fce8e6] rounded-lg">
+                    <svg className="w-5 h-5 text-[#c5221f] flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                    </svg>
+                    <span className="text-sm text-[#c5221f]">{factor}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {file.recommendations.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-[#202124] mb-3">改善提案</h3>
+              <div className="space-y-2">
+                {file.recommendations.map((rec, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-[#e8f0fe] rounded-lg">
+                    <svg className="w-5 h-5 text-[#1a73e8] flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
+                    </svg>
+                    <span className="text-sm text-[#1a73e8]">{rec}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Permissions */}
+          <div>
+            <h3 className="text-sm font-medium text-[#202124] mb-3">共有設定</h3>
+            <div className="space-y-2">
+              {file.permissions.map((perm) => (
+                <div key={perm.id} className="flex items-center gap-3 p-3 bg-[#f8f9fa] rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-[#dadce0] flex items-center justify-center">
+                    {perm.type === 'anyone' ? (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                      </svg>
+                    ) : perm.type === 'domain' ? (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#202124] truncate">
+                      {perm.type === 'anyone'
+                        ? 'リンクを知っている全員'
+                        : perm.type === 'domain'
+                        ? `${perm.domain} のすべてのユーザー`
+                        : perm.displayName || perm.emailAddress || 'ユーザー'}
+                    </p>
+                    <p className="text-xs text-[#5f6368]">
+                      {perm.role === 'owner'
+                        ? 'オーナー'
+                        : perm.role === 'writer'
+                        ? '編集者'
+                        : perm.role === 'commenter'
+                        ? 'コメント可'
+                        : '閲覧者'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-[#dadce0] flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-[#5f6368] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] transition-colors"
+          >
+            閉じる
+          </button>
+          <a
+            href={getShareUrl(file.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#1a73e8] rounded-md hover:bg-[#1557b0] transition-colors text-center inline-flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+            </svg>
+            共有設定を開く
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function FileRow({ file, onClick }: { file: ScannedFile; onClick: () => void }) {
+  const config = RISK_LEVEL_CONFIG[file.riskLevel];
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-center gap-4 p-4 hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e8eaed] last:border-b-0"
+    >
+      {/* Icon */}
+      {file.iconLink ? (
+        <img src={file.iconLink} alt="" className="w-6 h-6 flex-shrink-0" />
+      ) : (
+        <div className="w-6 h-6 bg-[#f1f3f4] rounded flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+          </svg>
+        </div>
+      )}
+
+      {/* Name & Owner */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-[#202124] truncate">{file.name}</p>
+        <p className="text-xs text-[#5f6368]">{file.ownerName}</p>
+      </div>
+
+      {/* Risk Badge */}
+      <div className={`px-2 py-1 rounded text-xs font-medium ${config.bgColor} ${config.color}`}>
+        {config.label}
+      </div>
+
+      {/* Risk Score */}
+      <div className="w-12 text-right">
+        <span className={`text-sm font-medium ${config.color}`}>{file.riskScore}</span>
+      </div>
+
+      {/* Factors count */}
+      <div className="w-16 text-right text-sm text-[#5f6368]">
+        {file.riskFactors.length}件
+      </div>
+
+      {/* Arrow */}
+      <svg className="w-5 h-5 text-[#5f6368] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+      </svg>
+    </div>
+  );
+}
+
+export function FilesPage() {
+  const { scanId } = useParams<{ scanId: string }>();
+  const navigate = useNavigate();
+  const [selectedFile, setSelectedFile] = useState<ScannedFile | null>(null);
+  const [riskLevelFilter, setRiskLevelFilter] = useState<RiskLevel | 'all'>('all');
+  const [offset, setOffset] = useState(0);
+  const limit = 20;
+
+  // Get scan info
+  const { data: scanData } = useQuery({
+    queryKey: ['scan', scanId],
+    queryFn: () => scanApi.getById(scanId!),
+    enabled: !!scanId,
+  });
+
+  // Get files
+  const { data: filesData, isLoading, isError } = useQuery({
+    queryKey: ['scanFiles', scanId, riskLevelFilter, offset],
+    queryFn: () =>
+      scanApi.getFiles(scanId!, {
+        limit,
+        offset,
+        riskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
+      }),
+    enabled: !!scanId,
+  });
+
+  const scan = scanData?.scan;
+  const files = filesData?.files || [];
+  const pagination = filesData?.pagination;
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-full hover:bg-[#f1f3f4] transition-colors"
+          >
+            <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-normal text-[#202124]">スキャン結果</h1>
+            {scan && (
+              <p className="text-sm text-[#5f6368] mt-1">
+                {scan.createdAt ? new Date(scan.createdAt).toLocaleString('ja-JP') : ''} • {scan.totalFiles.toLocaleString()}件のファイル
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        {scan && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(['critical', 'high', 'medium', 'low'] as RiskLevel[]).map((level) => {
+              const config = RISK_LEVEL_CONFIG[level];
+              const count = scan.riskySummary[level];
+              const isActive = riskLevelFilter === level;
+              return (
+                <button
+                  key={level}
+                  onClick={() => {
+                    setRiskLevelFilter(isActive ? 'all' : level);
+                    setOffset(0);
+                  }}
+                  className={`p-4 rounded-xl text-center transition-all ${
+                    isActive
+                      ? `${config.bgColor} ring-2 ${config.borderColor.replace('border', 'ring')}`
+                      : 'bg-white border border-[#dadce0] hover:border-[#5f6368]'
+                  }`}
+                >
+                  <p className={`text-2xl font-medium ${config.color}`}>{count}</p>
+                  <p className="text-xs text-[#5f6368]">{config.label}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Filter info */}
+        {riskLevelFilter !== 'all' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[#5f6368]">フィルター:</span>
+            <span className={`px-2 py-1 rounded text-xs font-medium ${RISK_LEVEL_CONFIG[riskLevelFilter].bgColor} ${RISK_LEVEL_CONFIG[riskLevelFilter].color}`}>
+              {RISK_LEVEL_CONFIG[riskLevelFilter].label}
+            </span>
+            <button
+              onClick={() => {
+                setRiskLevelFilter('all');
+                setOffset(0);
+              }}
+              className="text-sm text-[#1a73e8] hover:underline"
+            >
+              クリア
+            </button>
+          </div>
+        )}
+
+        {/* File List */}
+        <div className="bg-white rounded-xl border border-[#dadce0] overflow-hidden">
+          {/* Table header */}
+          <div className="flex items-center gap-4 px-4 py-3 bg-[#f8f9fa] border-b border-[#e8eaed] text-xs text-[#5f6368] font-medium">
+            <div className="w-6" />
+            <div className="flex-1">ファイル名</div>
+            <div className="w-14 text-center">リスク</div>
+            <div className="w-12 text-right">スコア</div>
+            <div className="w-16 text-right">問題数</div>
+            <div className="w-5" />
+          </div>
+
+          {isLoading ? (
+            <div className="p-8 text-center">
+              <svg className="w-8 h-8 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="mt-2 text-sm text-[#5f6368]">読み込み中...</p>
+            </div>
+          ) : isError ? (
+            <div className="p-8 text-center">
+              <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+              </svg>
+              <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+            </div>
+          ) : files.length === 0 ? (
+            <div className="p-8 text-center">
+              <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
+              </svg>
+              <p className="mt-2 text-sm text-[#5f6368]">該当するファイルがありません</p>
+            </div>
+          ) : (
+            <div>
+              {files.map((file) => (
+                <FileRow
+                  key={file.id}
+                  file={file}
+                  onClick={() => setSelectedFile(file)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pagination && pagination.total > limit && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-[#5f6368]">
+              {offset + 1} - {Math.min(offset + files.length, pagination.total)} / {pagination.total}件
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setOffset(Math.max(0, offset - limit))}
+                disabled={offset === 0}
+                className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                前へ
+              </button>
+              <button
+                onClick={() => setOffset(offset + limit)}
+                disabled={!pagination.hasMore}
+                className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                次へ
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* File Detail Modal */}
+      {selectedFile && (
+        <FileDetailModal
+          file={selectedFile}
+          onClose={() => setSelectedFile(null)}
+        />
+      )}
+    </Layout>
+  );
+}
