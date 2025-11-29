@@ -23,7 +23,7 @@
 
 | マイルストーン | 状態 | 進捗 |
 |--------------|------|------|
-| Milestone 1: 環境構築完了 | 🔄 進行中 | 3/8 |
+| Milestone 1: 環境構築完了 | 🔄 進行中 | 4/8 |
 | Milestone 2: GCP環境構築 | ⏳ 未着手 | 0/6 |
 | Milestone 3: バックエンドAPI開発 | ⏳ 未着手 | 0/5 |
 | Milestone 4: フロントエンド開発 | ⏳ 未着手 | 0/5 |
@@ -38,9 +38,9 @@
 - [x] GitHubリポジトリ作成 (https://github.com/haruniko-app/workspace-mamoriban)
 - [x] 初期コミット・プッシュ
 - [x] GCP + Cloud Run アーキテクチャ設計
+- [x] gcloud CLI インストール (v548.0.0)
 
 ### 未完了
-- [ ] gcloud CLI インストール
 - [ ] プロジェクト構造作成
   - [ ] `backend/` ディレクトリ（Node.js API）
   - [ ] `frontend/` ディレクトリ（React）
