@@ -11,6 +11,7 @@
 |---------|------|
 | **Frontend** | React + Vite + Tailwind CSS |
 | **Backend** | Node.js (Express) |
+| **データベース** | Firestore |
 | **認証** | Google OAuth 2.0 + Service Account |
 | **ホスティング** | Cloud Run |
 | **シークレット管理** | Secret Manager |
@@ -26,6 +27,7 @@
 | プロジェクトID | `workspace-mamoriban` |
 | リージョン | `asia-northeast1` |
 | Artifact Registry | `asia-northeast1-docker.pkg.dev/workspace-mamoriban/workspace-mamoriban` |
+| Firestore | `(default)` データベース |
 | サービスアカウント | `github-actions@workspace-mamoriban.iam.gserviceaccount.com` |
 
 ---
