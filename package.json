@@ -1,0 +1,47 @@
+{
+  "name": "workspace-mamoriban",
+  "version": "0.1.0",
+  "description": "Google Workspace向けセキュリティ可視化ツール - 共有設定の可視化と情報漏洩リスク検出",
+  "author": "haruniko-app",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haruniko-app/workspace-mamoriban.git"
+  },
+  "keywords": [
+    "google-workspace",
+    "google-cloud",
+    "cloud-run",
+    "security",
+    "drive",
+    "sharing",
+    "audit",
+    "isms",
+    "compliance"
+  ],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "deploy:dev": "bash scripts/deploy-dev.sh",
+    "deploy:prod": "bash scripts/deploy-prod.sh",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
