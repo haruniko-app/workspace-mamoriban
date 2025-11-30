@@ -1,6 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 
 const features = [
   'Google Drive™ の共有設定を自動スキャン',
@@ -168,7 +168,7 @@ export function LoginPage() {
             </div>
 
             <p className="mt-6 text-xs text-center text-gray-500">
-              ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます
+              ログインすることで、<Link to="/terms" className="text-blue-600 hover:underline">利用規約</Link>と<Link to="/privacy" className="text-blue-600 hover:underline">プライバシーポリシー</Link>に同意したものとみなされます
             </p>
           </div>
         </div>
@@ -176,8 +176,12 @@ export function LoginPage() {
 
       {/* Footer */}
       <footer className="px-6 py-4 border-t border-gray-200">
+        <div className="flex items-center justify-center gap-8 text-sm text-gray-500 mb-4">
+          <Link to="/privacy" className="hover:text-gray-700">プライバシー</Link>
+          <Link to="/terms" className="hover:text-gray-700">利用規約</Link>
+        </div>
         <div className="flex items-center justify-center text-sm text-gray-500 mb-2">
-          <span>&copy; 2025 Haruniko Inc.</span>
+          <span>&copy; 2025 株式会社ハルニコ</span>
         </div>
         <p className="text-xs text-gray-400 text-center">
           Google Workspace、Google Drive、Gmail は Google LLC の商標です。本サービスは Google LLC が提供・承認するものではありません。

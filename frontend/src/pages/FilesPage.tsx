@@ -62,12 +62,18 @@ function FileDetailModal({ file, onClose }: { file: ScannedFile; onClose: () => 
               <span className={`text-sm font-medium ${config.color}`}>リスクスコア</span>
               <span className={`text-2xl font-bold ${config.color}`}>{file.riskScore}点</span>
             </div>
-            <div className="h-2 bg-white/50 rounded-full overflow-hidden">
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className={`h-full ${config.borderColor.replace('border', 'bg')}`}
-                style={{ width: `${file.riskScore}%` }}
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(file.riskScore, 3)}%`,
+                  backgroundColor: file.riskLevel === 'critical' ? '#c5221f' :
+                    file.riskLevel === 'high' ? '#e37400' :
+                    file.riskLevel === 'medium' ? '#f9ab00' : '#137333'
+                }}
               />
             </div>
+            <p className="text-xs text-gray-500 mt-2 text-right">{file.riskScore} / 100</p>
           </div>
 
           {/* Risk Factors */}

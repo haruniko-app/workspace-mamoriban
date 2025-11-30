@@ -1,0 +1,160 @@
+import { Link } from 'react-router-dom';
+
+export function PrivacyPage() {
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[22px] text-gray-700">Workspace</span>
+              <span className="text-[22px] text-gray-700 font-normal">守り番</span>
+            </div>
+          </Link>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-3xl mx-auto px-6 py-12">
+        <h1 className="text-3xl font-semibold text-gray-800 mb-4">プライバシーポリシー</h1>
+        <p className="text-gray-500 mb-12">最終更新日: 2025年11月27日</p>
+
+        <div className="space-y-8 text-gray-600 leading-relaxed">
+          <p>
+            このプライバシーポリシーは、Workspace守り番がサービス使用時にどのように情報を収集、使用、保護するかについて説明します。
+          </p>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">1. アクセスする情報</h2>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="text-gray-800">アカウント情報：</strong>
+                Googleアカウントから取得する氏名、メールアドレス、プロフィール画像。
+              </li>
+              <li>
+                <strong className="text-gray-800">組織情報：</strong>
+                Google Workspace™のドメイン情報。
+              </li>
+              <li>
+                <strong className="text-gray-800">ファイルメタデータ：</strong>
+                Google Drive™のファイル名、共有設定、権限情報。<strong>ファイルの内容（コンテンツ）は取得しません。</strong>
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">2. 情報の使用方法</h2>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>共有設定のスキャン・リスク評価を提供</li>
+              <li>セキュリティリスクの可視化・レポート生成</li>
+              <li>サービスの改善・開発</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">3. データの保存</h2>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="text-gray-800">ファイル内容非取得：</strong>
+                ファイルの内容（コンテンツ）を取得・保存することはありません。
+              </li>
+              <li>
+                <strong className="text-gray-800">メタデータ：</strong>
+                スキャン結果（ファイル名、共有設定等）は一定期間保存後、自動削除されます。
+              </li>
+              <li>
+                <strong className="text-gray-800">アカウント情報：</strong>
+                サービス提供に必要な期間保存されます。
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">4. データの共有</h2>
+            <p className="mb-4">以下の場合を除き、情報を第三者に販売・転送しません：</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="text-gray-800">決済処理：</strong>
+                有料プランの決済はStripeを通じて処理されます。
+              </li>
+              <li>
+                <strong className="text-gray-800">法的要件：</strong>
+                法律で要求される場合、情報を開示する場合があります。
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">5. セキュリティ</h2>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>すべてのデータ送信はHTTPS暗号化を使用</li>
+              <li>Google Cloud Platformの安全なインフラストラクチャを使用</li>
+              <li>アクセス制御と定期的なセキュリティ監査を実施</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">6. お客様の権利</h2>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                <strong className="text-gray-800">アクセス：</strong>
+                自己の個人情報へのアクセスを請求できます。
+              </li>
+              <li>
+                <strong className="text-gray-800">削除：</strong>
+                アカウント削除により、関連するすべてのデータが削除されます。
+              </li>
+              <li>
+                <strong className="text-gray-800">連携解除：</strong>
+                Googleアカウントとの連携をいつでも解除できます。
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">7. 児童のプライバシー</h2>
+            <p>本サービスは13歳未満の児童を対象としていません。児童から個人情報を故意に収集することはありません。</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">8. 変更</h2>
+            <p>このポリシーを更新する場合があります。変更は「最終更新日」で示されます。</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">9. お問い合わせ</h2>
+            <p>
+              <strong className="text-gray-800">株式会社ハルニコ</strong><br />
+              〒123-0852 東京都足立区関原3-5-7<br />
+              メール: info@haruniko.co.jp
+            </p>
+          </section>
+        </div>
+
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          <Link to="/login" className="text-blue-600 hover:underline">
+            ← ログインページに戻る
+          </Link>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="px-6 py-4 border-t border-gray-200 mt-16">
+        <div className="flex items-center justify-center gap-8 text-sm text-gray-500 mb-4">
+          <Link to="/login" className="hover:text-gray-700">TOP</Link>
+          <Link to="/privacy" className="hover:text-gray-700">プライバシー</Link>
+          <Link to="/terms" className="hover:text-gray-700">利用規約</Link>
+        </div>
+        <p className="text-xs text-gray-400 text-center">
+          &copy; 2025 株式会社ハルニコ &middot; Google Workspace、Google Drive は Google LLC の商標です。
+        </p>
+      </footer>
+    </div>
+  );
+}

@@ -207,13 +207,25 @@ export const ScanService = {
     return convertScanTimestamps(doc.data() as Scan);
   },
 
-  async getByOrganization(organizationId: string, limit = 10): Promise<Scan[]> {
+  async getByOrganization(organizationId: string, limit = 10, offset = 0): Promise<{ scans: Scan[]; total: number }> {
+    // Get total count
+    const countSnapshot = await scansRef
+      .where('organizationId', '==', organizationId)
+      .count()
+      .get();
+    const total = countSnapshot.data().count;
+
+    // Get paginated results (Firestore doesn't support offset natively, so we fetch limit+offset and slice)
     const snapshot = await scansRef
       .where('organizationId', '==', organizationId)
       .orderBy('createdAt', 'desc')
-      .limit(limit)
+      .limit(limit + offset)
       .get();
-    return snapshot.docs.map((doc) => convertScanTimestamps(doc.data() as Scan));
+
+    const allScans = snapshot.docs.map((doc) => convertScanTimestamps(doc.data() as Scan));
+    const scans = allScans.slice(offset, offset + limit);
+
+    return { scans, total };
   },
 
   async update(id: string, data: Partial<Scan>): Promise<void> {

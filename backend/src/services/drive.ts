@@ -443,7 +443,7 @@ export async function deletePermissionFromFolder(
   // フォルダ内のファイルを取得
   let pageToken: string | undefined = undefined;
   do {
-    const response = await drive.files.list({
+    const response: { data: drive_v3.Schema$FileList } = await drive.files.list({
       pageSize: 100,
       pageToken,
       q: `'${folderId}' in parents and trashed = false`,
@@ -456,7 +456,7 @@ export async function deletePermissionFromFolder(
       if (!file.id || !file.permissions) continue;
 
       // 該当する権限を探す
-      const targetPerm = file.permissions.find((p) => {
+      const targetPerm = file.permissions.find((p: drive_v3.Schema$Permission) => {
         if (permissionType === 'anyone') {
           return p.type === 'anyone';
         }

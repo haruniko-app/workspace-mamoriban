@@ -40,7 +40,7 @@ router.post('/start', async (req: Request, res: Response) => {
     thisMonth.setHours(0, 0, 0, 0);
 
     // 今月のスキャン回数を取得
-    const recentScans = await ScanService.getByOrganization(organization.id, 100);
+    const { scans: recentScans } = await ScanService.getByOrganization(organization.id, 100);
     const monthlyScans = recentScans.filter(
       (scan) => new Date(scan.createdAt) >= thisMonth
     );
@@ -293,9 +293,10 @@ const SCAN_TIMEOUT_MS = 10 * 60 * 1000;
 router.get('/', async (req: Request, res: Response) => {
   const organization = req.organization!;
   const limit = parseInt(req.query.limit as string) || 10;
+  const offset = parseInt(req.query.offset as string) || 0;
 
   try {
-    const scans = await ScanService.getByOrganization(organization.id, limit);
+    const { scans, total } = await ScanService.getByOrganization(organization.id, limit, offset);
 
     // 古いrunning状態のスキャンをタイムアウトとしてマーク
     const now = Date.now();
@@ -317,7 +318,15 @@ router.get('/', async (req: Request, res: Response) => {
       })
     );
 
-    res.json({ scans: updatedScans });
+    res.json({
+      scans: updatedScans,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + scans.length < total,
+      },
+    });
   } catch (err) {
     console.error('Get scan history error:', err);
     res.status(500).json({ error: 'Internal server error' });

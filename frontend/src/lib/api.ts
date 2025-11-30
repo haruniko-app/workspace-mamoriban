@@ -87,7 +87,11 @@ export const organizationApi = {
 export const scanApi = {
   start: () => api.post<{ scanId: string; status: string; message: string }>('/api/scan/start'),
   getById: (scanId: string) => api.get<{ scan: Scan }>(`/api/scan/${scanId}`),
-  getHistory: (limit = 10) => api.get<{ scans: Scan[] }>('/api/scan', { params: { limit: String(limit) } }),
+  getHistory: (limit = 10, offset = 0) =>
+    api.get<{ scans: Scan[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean } }>(
+      '/api/scan',
+      { params: { limit: String(limit), offset: String(offset) } }
+    ),
   getFiles: (scanId: string, options?: {
     limit?: number;
     offset?: number;

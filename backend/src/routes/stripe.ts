@@ -50,7 +50,7 @@ router.get('/subscription', requireAuth, async (req: Request, res: Response) => 
     thisMonth.setDate(1);
     thisMonth.setHours(0, 0, 0, 0);
 
-    const recentScans = await ScanService.getByOrganization(organization.id, 100);
+    const { scans: recentScans } = await ScanService.getByOrganization(organization.id, 100);
     const monthlyScans = recentScans.filter(
       (scan) => new Date(scan.createdAt) >= thisMonth
     );

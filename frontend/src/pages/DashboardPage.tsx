@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { scanApi, type Scan } from '../lib/api';
 import { Layout } from '../components/Layout';
@@ -110,16 +111,20 @@ function ScanHistoryItem({ scan, onClick }: { scan: Scan; onClick: () => void })
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const [offset, setOffset] = useState(0);
+  const limit = 5;
+
   const {
     data: historyData,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['scanHistory'],
-    queryFn: () => scanApi.getHistory(5),
+    queryKey: ['scanHistory', offset],
+    queryFn: () => scanApi.getHistory(limit, offset),
   });
 
   const latestScan = historyData?.scans.find((s) => s.status === 'completed');
+  const pagination = historyData?.pagination;
 
   const handleScanClick = (scan: Scan) => {
     if (scan.status === 'completed') {
@@ -324,6 +329,31 @@ export function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {pagination && pagination.total > limit && (
+            <div className="px-6 py-3 border-t border-[#e8eaed] flex items-center justify-between">
+              <p className="text-sm text-[#5f6368]">
+                {offset + 1} - {Math.min(offset + (historyData?.scans.length || 0), pagination.total)} / {pagination.total}件
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setOffset(Math.max(0, offset - limit))}
+                  disabled={offset === 0}
+                  className="px-3 py-1.5 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  前へ
+                </button>
+                <button
+                  onClick={() => setOffset(offset + limit)}
+                  disabled={!pagination.hasMore}
+                  className="px-3 py-1.5 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  次へ
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
