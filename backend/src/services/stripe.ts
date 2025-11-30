@@ -2,13 +2,25 @@ import Stripe from 'stripe';
 import { OrganizationService } from './firestore.js';
 import type { Organization } from '../types/models.js';
 
-// Stripe初期化
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+// Stripe遅延初期化（dotenvが読み込まれた後に初期化されるよう）
+let stripeInstance: Stripe | null = null;
 
-// 料金プラン設定
-export const PLAN_CONFIG = {
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    stripeInstance = new Stripe(secretKey, {
+      apiVersion: '2023-10-16',
+    });
+  }
+  return stripeInstance;
+}
+
+
+// 料金プラン設定（基本情報）
+const PLAN_CONFIG_BASE = {
   free: {
     name: '無料',
     price: 0,
@@ -22,7 +34,6 @@ export const PLAN_CONFIG = {
     maxUsers: 20,
     maxScansPerMonth: 10,
     features: ['週次レポート', 'メールアラート', '履歴保存（3ヶ月）'],
-    stripePriceId: process.env.STRIPE_BASIC_PRICE_ID,
   },
   pro: {
     name: 'プロ',
@@ -30,7 +41,6 @@ export const PLAN_CONFIG = {
     maxUsers: 100,
     maxScansPerMonth: -1, // 無制限
     features: ['ISMS/Pマークレポート', 'API連携', '履歴保存（1年）', '優先サポート'],
-    stripePriceId: process.env.STRIPE_PRO_PRICE_ID,
   },
   enterprise: {
     name: 'エンタープライズ',
@@ -38,9 +48,23 @@ export const PLAN_CONFIG = {
     maxUsers: -1, // 無制限
     maxScansPerMonth: -1, // 無制限
     features: ['カスタムレポート', '専任サポート', 'SLA保証', 'オンプレミス対応'],
-    stripePriceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
   },
 } as const;
+
+// Price IDを動的に取得（環境変数が読み込まれた後に評価）
+function getStripePriceId(plan: 'basic' | 'pro' | 'enterprise'): string | undefined {
+  switch (plan) {
+    case 'basic':
+      return process.env.STRIPE_BASIC_PRICE_ID;
+    case 'pro':
+      return process.env.STRIPE_PRO_PRICE_ID;
+    case 'enterprise':
+      return process.env.STRIPE_ENTERPRISE_PRICE_ID;
+  }
+}
+
+// 後方互換性のためのエクスポート
+export const PLAN_CONFIG = PLAN_CONFIG_BASE;
 
 export type PlanType = keyof typeof PLAN_CONFIG;
 
@@ -52,7 +76,7 @@ export async function createCustomer(
   email: string,
   name: string
 ): Promise<Stripe.Customer> {
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     name,
     metadata: {
@@ -76,7 +100,7 @@ export async function getOrCreateCustomer(
 ): Promise<Stripe.Customer> {
   if (organization.stripeCustomerId) {
     try {
-      return await stripe.customers.retrieve(organization.stripeCustomerId) as Stripe.Customer;
+      return await getStripe().customers.retrieve(organization.stripeCustomerId) as Stripe.Customer;
     } catch {
       // 顧客が見つからない場合は新規作成
     }
@@ -95,13 +119,13 @@ export async function createCheckoutSession(
   cancelUrl: string
 ): Promise<Stripe.Checkout.Session> {
   const customer = await getOrCreateCustomer(organization);
-  const priceId = PLAN_CONFIG[plan].stripePriceId;
+  const priceId = getStripePriceId(plan);
 
   if (!priceId) {
-    throw new Error(`Price ID not configured for plan: ${plan}`);
+    throw new Error(`Price ID not configured for plan: ${plan}. Please set STRIPE_${plan.toUpperCase()}_PRICE_ID environment variable.`);
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customer.id,
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -143,7 +167,7 @@ export async function createPortalSession(
     throw new Error('Organization does not have a Stripe customer ID');
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: organization.stripeCustomerId,
     return_url: returnUrl,
   });
@@ -158,7 +182,7 @@ export async function getSubscription(
   subscriptionId: string
 ): Promise<Stripe.Subscription | null> {
   try {
-    return await stripe.subscriptions.retrieve(subscriptionId);
+    return await getStripe().subscriptions.retrieve(subscriptionId);
   } catch {
     return null;
   }
@@ -190,11 +214,11 @@ export async function cancelSubscription(
   immediately = false
 ): Promise<Stripe.Subscription> {
   if (immediately) {
-    return stripe.subscriptions.cancel(subscriptionId);
+    return getStripe().subscriptions.cancel(subscriptionId);
   }
 
   // 期間終了時にキャンセル
-  return stripe.subscriptions.update(subscriptionId, {
+  return getStripe().subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
   });
 }
@@ -211,7 +235,7 @@ export function constructWebhookEvent(
     throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
   }
 
-  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+  return getStripe().webhooks.constructEvent(payload, signature, webhookSecret);
 }
 
 /**
@@ -249,4 +273,4 @@ export function getPlanInfo(plan: PlanType) {
   return PLAN_CONFIG[plan];
 }
 
-export { stripe };
+export { getStripe };

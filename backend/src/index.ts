@@ -1,9 +1,12 @@
+// dotenvを最初に読み込む（ESモジュールではimport文が先に評価されるため）
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import dotenv from 'dotenv';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -11,8 +14,6 @@ import scanRoutes from './routes/scan.js';
 import organizationRoutes from './routes/organization.js';
 import stripeRoutes from './routes/stripe.js';
 import auditLogRoutes from './routes/auditLogs.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
