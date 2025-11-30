@@ -227,9 +227,9 @@
 - [x] FRONTEND_URLを5174→5173に修正
 - [x] CSS `@import`の順序警告を修正
 
-### ユニットテスト結果（自動実行: 2025-11-30）✅
+### 自動テスト結果（実行: 2025-11-30）✅
 
-**総計: 66テスト合格 / 66テスト**
+**総計: 84テスト合格 / 84テスト**
 
 #### リスク計算ロジック (`risk.test.ts`) - 30テスト ✅
 
@@ -266,6 +266,19 @@
 | `isPubliclyShared` | 3 | ✅ | 「リンクを知っている全員」共有判定 |
 | `hasExternalSharing` | 7 | ✅ | 外部共有判定（anyone/domain/user/group） |
 | `hasExternalEditor` | 7 | ✅ | 外部編集者判定（writer/organizer/fileOrganizer） |
+
+#### API統合テスト (`api.test.ts`) - 18テスト ✅
+
+| テストカテゴリ | テスト数 | 結果 | 内容 |
+|--------------|---------|------|------|
+| Health Check | 1 | ✅ | `/health` エンドポイント |
+| API Root | 1 | ✅ | `/api` エンドポイント |
+| Stripe Plans API | 5 | ✅ | プラン一覧取得、各プラン詳細確認 |
+| Stripe 認証保護 | 3 | ✅ | subscription/checkout/portal 401確認 |
+| Auth Routes | 3 | ✅ | login/me/logout エンドポイント |
+| Error Handling | 1 | ✅ | 404エラーハンドリング |
+| Security Headers | 2 | ✅ | Helmet、CORS設定確認 |
+| Plan Details | 2 | ✅ | プラン構造と順序確認 |
 
 ---
 
@@ -328,7 +341,7 @@
   - [x] ユニットテスト（リスク計算ロジック）✅ 2025-11-30 30テスト合格
   - [x] ユニットテスト（Stripeプラン管理）✅ 2025-11-30 19テスト合格
   - [x] ユニットテスト（Drive共有判定）✅ 2025-11-30 17テスト合格
-  - [ ] 統合テスト（API）
+  - [x] 統合テスト（API）✅ 2025-11-30 18テスト合格
   - [ ] E2Eテスト（Playwright/Cypress）
 - [ ] CI/CD構築
   - [x] GitHub Actions設定 (ci.yml, deploy.yml)
