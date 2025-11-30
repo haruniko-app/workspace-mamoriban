@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { scanApi, type Scan } from '../lib/api';
 import { Layout } from '../components/Layout';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 function RiskCard({
   level,
@@ -17,7 +17,7 @@ function RiskCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-2xl p-5 ${bgColor} transition-all hover:shadow-md cursor-pointer`}>
+    <div className={`rounded-2xl p-5 ${bgColor}`}>
       <div className="flex items-center gap-3 mb-3">
         {icon}
         <span className={`text-sm font-medium ${color}`}>{level}</span>
@@ -28,9 +28,11 @@ function RiskCard({
   );
 }
 
-function ScanHistoryItem({ scan }: { scan: Scan }) {
-  const formatDate = (dateString: string) => {
+function ScanHistoryItem({ scan, onClick }: { scan: Scan; onClick: () => void }) {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '日時不明';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '日時不明';
     return date.toLocaleDateString('ja-JP', {
       month: 'short',
       day: 'numeric',
@@ -40,7 +42,10 @@ function ScanHistoryItem({ scan }: { scan: Scan }) {
   };
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 hover:bg-[#f1f3f4] rounded-lg transition-colors cursor-pointer group">
+    <div
+      onClick={onClick}
+      className="flex items-center justify-between py-3 px-4 hover:bg-[#f1f3f4] rounded-lg transition-colors cursor-pointer group"
+    >
       <div className="flex items-center gap-4">
         <div
           className={`h-10 w-10 rounded-full flex items-center justify-center ${
@@ -104,6 +109,7 @@ function ScanHistoryItem({ scan }: { scan: Scan }) {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const {
     data: historyData,
     isLoading,
@@ -114,6 +120,12 @@ export function DashboardPage() {
   });
 
   const latestScan = historyData?.scans.find((s) => s.status === 'completed');
+
+  const handleScanClick = (scan: Scan) => {
+    if (scan.status === 'completed') {
+      navigate(`/scan/${scan.id}/files`);
+    }
+  };
 
   return (
     <Layout>
@@ -307,7 +319,7 @@ export function DashboardPage() {
             ) : (
               <div className="divide-y divide-[#e8eaed]">
                 {historyData?.scans.map((scan) => (
-                  <ScanHistoryItem key={scan.id} scan={scan} />
+                  <ScanHistoryItem key={scan.id} scan={scan} onClick={() => handleScanClick(scan)} />
                 ))}
               </div>
             )}

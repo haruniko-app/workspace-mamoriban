@@ -43,9 +43,10 @@ export function SettingsPage() {
   });
 
   // Get subscription info
-  const { data: subscriptionData } = useQuery({
+  const { data: subscriptionData, isError: subscriptionError } = useQuery({
     queryKey: ['subscription'],
     queryFn: stripeApi.getSubscription,
+    retry: false,
   });
 
   // Get plans
@@ -86,6 +87,7 @@ export function SettingsPage() {
   const subscription = subscriptionData;
   const plans = plansData?.plans || [];
   const currentPlan = subscription?.plan || 'free';
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
   const handleUpgrade = (plan: 'basic' | 'pro' | 'enterprise') => {
     setSelectedPlan(plan);
@@ -255,7 +257,7 @@ export function SettingsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {currentPlan !== 'free' && (
+                {isAdmin && currentPlan !== 'free' && subscription?.subscription && (
                   <button
                     onClick={handleManageSubscription}
                     disabled={portalMutation.isPending}
@@ -267,7 +269,7 @@ export function SettingsPage() {
                     プラン管理
                   </button>
                 )}
-                {currentPlan === 'free' && (
+                {isAdmin && (currentPlan === 'free' || subscriptionError) && (
                   <button
                     onClick={() => handleUpgrade('basic')}
                     className="btn-google-primary"
@@ -363,18 +365,29 @@ export function SettingsPage() {
                         </li>
                       ))}
                     </ul>
-                    {plan.id === currentPlan ? (
-                      <div className="mt-3 text-xs text-[#1a73e8] font-medium">
-                        現在のプラン
-                      </div>
-                    ) : plan.id !== 'free' && currentPlan === 'free' ? (
-                      <button
-                        onClick={() => handleUpgrade(plan.id as 'basic' | 'pro' | 'enterprise')}
-                        className="mt-3 w-full py-2 text-xs font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] transition-colors"
-                      >
-                        このプランにする
-                      </button>
-                    ) : null}
+                    {(() => {
+                      const planOrder = ['free', 'basic', 'pro', 'enterprise'];
+                      const currentIndex = planOrder.indexOf(currentPlan);
+                      const planIndex = planOrder.indexOf(plan.id);
+
+                      if (plan.id === currentPlan) {
+                        return (
+                          <div className="mt-3 text-xs text-[#1a73e8] font-medium">
+                            現在のプラン
+                          </div>
+                        );
+                      } else if (isAdmin && planIndex > currentIndex && plan.id !== 'free') {
+                        return (
+                          <button
+                            onClick={() => handleUpgrade(plan.id as 'basic' | 'pro' | 'enterprise')}
+                            className="mt-3 w-full py-2 text-xs font-medium text-[#1a73e8] bg-[#e8f0fe] rounded-lg hover:bg-[#d2e3fc] transition-colors"
+                          >
+                            アップグレード
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 ))}
               </div>

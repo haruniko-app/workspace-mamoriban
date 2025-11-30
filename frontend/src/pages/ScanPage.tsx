@@ -1,24 +1,67 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { scanApi, type Scan } from '../lib/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { scanApi, stripeApi, type Scan } from '../lib/api';
 import { Layout } from '../components/Layout';
 
-function ScanProgress({ scan }: { scan: Scan }) {
+const SCAN_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isTimedOut, setIsTimedOut] = useState(false);
+
   const total =
     scan.riskySummary.critical +
     scan.riskySummary.high +
     scan.riskySummary.medium +
     scan.riskySummary.low;
 
+  // Calculate elapsed time and check for timeout
+  useEffect(() => {
+    if (scan.status !== 'running') {
+      setIsTimedOut(false);
+      return;
+    }
+
+    const startTime = new Date(scan.startedAt).getTime();
+
+    const updateElapsed = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      setElapsedTime(elapsed);
+
+      if (elapsed >= SCAN_TIMEOUT_MS) {
+        setIsTimedOut(true);
+      }
+    };
+
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 1000);
+
+    return () => clearInterval(interval);
+  }, [scan.status, scan.startedAt]);
+
+  const formatElapsedTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-[#dadce0] p-6">
       <div className="flex items-center gap-4 mb-6">
-        {scan.status === 'running' ? (
+        {scan.status === 'running' && !isTimedOut ? (
           <div className="w-12 h-12 rounded-full bg-[#e8f0fe] flex items-center justify-center">
             <svg className="w-6 h-6 text-[#1a73e8] animate-spin" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+        ) : scan.status === 'running' && isTimedOut ? (
+          <div className="w-12 h-12 rounded-full bg-[#fef7e0] flex items-center justify-center">
+            <svg className="w-6 h-6 text-[#e37400]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
             </svg>
           </div>
         ) : scan.status === 'completed' ? (
@@ -34,23 +77,95 @@ function ScanProgress({ scan }: { scan: Scan }) {
             </svg>
           </div>
         )}
-        <div>
-          <h3 className="text-lg font-medium text-[#202124]">
-            {scan.status === 'running'
-              ? 'スキャン中...'
-              : scan.status === 'completed'
-              ? 'スキャン完了'
-              : 'スキャン失敗'}
-          </h3>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-[#202124]">
+              {scan.status === 'running' && !isTimedOut
+                ? scan.phase === 'counting'
+                  ? 'ファイル数を把握中...'
+                  : 'スキャン中...'
+                : scan.status === 'running' && isTimedOut
+                ? 'スキャンがタイムアウトしました'
+                : scan.status === 'completed'
+                ? 'スキャン完了'
+                : 'スキャン失敗'}
+            </h3>
+            {scan.status === 'running' && (
+              <span className="text-sm text-[#5f6368] tabular-nums">
+                経過時間: {formatElapsedTime(elapsedTime)}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[#5f6368]">
-            {scan.status === 'running'
-              ? `${scan.totalFiles}件のファイルを処理中`
+            {scan.status === 'running' && !isTimedOut
+              ? scan.phase === 'counting'
+                ? 'Google Drive内のファイルを数えています...'
+                : `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+              : scan.status === 'running' && isTimedOut
+              ? 'スキャンが長時間完了しませんでした。新しいスキャンを開始してください。'
               : scan.status === 'completed'
-              ? `${scan.totalFiles}件のファイルをスキャンしました`
+              ? `${scan.totalFiles.toLocaleString()}件のファイルをスキャンしました`
               : scan.errorMessage}
           </p>
         </div>
       </div>
+
+      {/* Progress bar for running scan */}
+      {scan.status === 'running' && !isTimedOut && (
+        <div className="mb-6">
+          {scan.phase === 'counting' ? (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[#5f6368]">ファイル数を把握中</span>
+                <span className="text-sm font-medium text-[#1a73e8]">準備中...</span>
+              </div>
+              <div className="h-2 bg-[#e8eaed] rounded-full overflow-hidden">
+                <div className="h-full bg-[#1a73e8] rounded-full animate-pulse w-full opacity-60" />
+              </div>
+              <p className="text-xs text-[#5f6368] mt-2">
+                Google Drive内のファイルの全体数を把握しています...
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[#5f6368]">処理中のファイル</span>
+                <span className="text-sm font-medium text-[#1a73e8]">
+                  {scan.processedFiles.toLocaleString()} / {scan.totalFiles.toLocaleString()}件
+                </span>
+              </div>
+              <div className="h-2 bg-[#e8eaed] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#1a73e8] rounded-full transition-all duration-500"
+                  style={{
+                    width: scan.totalFiles > 0
+                      ? `${Math.min((scan.processedFiles / scan.totalFiles) * 100, 100)}%`
+                      : '0%'
+                  }}
+                />
+              </div>
+              <p className="text-xs text-[#5f6368] mt-2">
+                共有設定を確認しています... ({Math.round((scan.processedFiles / scan.totalFiles) * 100)}% 完了)
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Timeout action */}
+      {scan.status === 'running' && isTimedOut && (
+        <div className="mb-6">
+          <button
+            onClick={onReset}
+            className="btn-google-secondary"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </svg>
+            新しいスキャンを開始
+          </button>
+        </div>
+      )}
 
       {scan.status === 'completed' && (
         <>
@@ -155,9 +270,26 @@ function ScanProgress({ scan }: { scan: Scan }) {
 }
 
 export function ScanPage() {
-  const [currentScanId, setCurrentScanId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Get scanId from URL query params for browser back button support
+  const currentScanId = searchParams.get('id');
+
+  const setCurrentScanId = (scanId: string | null) => {
+    if (scanId) {
+      setSearchParams({ id: scanId }, { replace: false });
+    } else {
+      setSearchParams({}, { replace: false });
+    }
+  };
+
+  // Get subscription info for plan limits
+  const { data: subscriptionData } = useQuery({
+    queryKey: ['subscription'],
+    queryFn: stripeApi.getSubscription,
+  });
 
   // Start scan mutation
   const startScanMutation = useMutation({
@@ -212,13 +344,35 @@ export function ScanPage() {
               <h2 className="text-xl font-medium text-[#202124] mb-2">
                 新規スキャンを開始
               </h2>
-              <p className="text-sm text-[#5f6368] mb-6">
+              <p className="text-sm text-[#5f6368] mb-4">
                 Google Drive 内のファイルの共有設定をスキャンし、
                 情報漏洩リスクを検出します
               </p>
+
+              {/* Plan Limit Display */}
+              {subscriptionData && (
+                <div className="mb-6">
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
+                    subscriptionData.limits.canScan
+                      ? 'bg-[#e6f4ea] text-[#137333]'
+                      : 'bg-[#fce8e6] text-[#c5221f]'
+                  }`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                    </svg>
+                    <span className="text-sm font-medium">
+                      {subscriptionData.planInfo.maxScansPerMonth === -1
+                        ? 'スキャン回数: 無制限'
+                        : `今月の残りスキャン: ${subscriptionData.limits.scansRemaining} / ${subscriptionData.planInfo.maxScansPerMonth}回`
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleStartScan}
-                disabled={startScanMutation.isPending}
+                disabled={startScanMutation.isPending || (subscriptionData && !subscriptionData.limits.canScan)}
                 className="btn-google-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {startScanMutation.isPending ? (
@@ -238,6 +392,30 @@ export function ScanPage() {
                   </>
                 )}
               </button>
+
+              {/* Scan limit reached warning */}
+              {subscriptionData && !subscriptionData.limits.canScan && (
+                <div className="mt-4 p-4 bg-[#fef7e0] rounded-lg text-left">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-[#e37400] flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-[#202124]">今月のスキャン回数上限に達しました</p>
+                      <p className="text-sm text-[#5f6368] mt-1">
+                        プランをアップグレードするとより多くのスキャンが可能になります。
+                      </p>
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="mt-2 text-sm text-[#1a73e8] hover:underline"
+                      >
+                        プランを確認する →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {startScanMutation.isError && (
                 <div className="mt-4 p-3 bg-[#fce8e6] rounded-lg">
                   <p className="text-sm text-[#c5221f]">
@@ -250,7 +428,7 @@ export function ScanPage() {
         )}
 
         {/* Current Scan Progress */}
-        {scanData?.scan && <ScanProgress scan={scanData.scan} />}
+        {scanData?.scan && <ScanProgress scan={scanData.scan} onReset={() => setCurrentScanId(null)} />}
 
         {/* Action Buttons */}
         {scanData?.scan.status === 'completed' && (

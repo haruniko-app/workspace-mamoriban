@@ -1,5 +1,5 @@
 import type { DriveFile, DrivePermission } from './drive.js';
-import { hasExternalSharing, hasExternalEditor, isPubliclyShared } from './drive.js';
+import { hasExternalSharing, hasExternalEditor, isPubliclyShared, hasInternalEditor } from './drive.js';
 import {
   detectSensitiveContent,
   getSensitiveCategoryLabel,
@@ -35,6 +35,17 @@ const CONFIDENTIAL_MIME_TYPES = [
 ];
 
 /**
+ * オーナーが組織内かどうかを判定
+ */
+export function isInternalOwner(file: DriveFile, organizationDomain: string): boolean {
+  if (!file.owners || file.owners.length === 0) return false;
+  const ownerEmail = file.owners[0].email;
+  if (!ownerEmail) return false;
+  const ownerDomain = ownerEmail.split('@')[1];
+  return ownerDomain === organizationDomain;
+}
+
+/**
  * ファイルのリスクスコアを計算
  */
 export function calculateRiskScore(
@@ -44,39 +55,71 @@ export function calculateRiskScore(
   const issues: RiskIssue[] = [];
   let score = 0;
 
-  // 1. 「リンクを知っている全員」共有 (+40点)
+  // オーナーが社内か社外かを判定
+  const internalOwner = isInternalOwner(file, organizationDomain);
+
+  // 外部オーナーの場合、リスク計算の重み付けを変更
+  // 外部から共有されてきたファイルは、自社の情報漏洩リスクは低い
+  // - 外部オーナー + 自社が編集者: 30%（社内情報を書き込む可能性あり）
+  // - 外部オーナー + 自社が閲覧者のみ: 10%（管理台帳には載せるが実質低リスク）
+  const hasInternalEditorRole = !internalOwner && hasInternalEditor(file, organizationDomain);
+  const ownerMultiplier = internalOwner ? 1.0 : (hasInternalEditorRole ? 0.3 : 0.1);
+
+  // 1. 「リンクを知っている全員」共有 (+50点、外部オーナーは減算)
   if (isPubliclyShared(file)) {
-    const points = 40;
+    const basePoints = 50;
+    const points = Math.round(basePoints * ownerMultiplier);
     score += points;
     issues.push({
       type: 'public_sharing',
-      severity: 'critical',
+      severity: internalOwner ? 'critical' : 'low',
       points,
-      description: '「リンクを知っている全員」がアクセス可能',
+      description: internalOwner
+        ? '「リンクを知っている全員」がアクセス可能'
+        : '「リンクを知っている全員」がアクセス可能（外部所有）',
     });
   }
 
-  // 2. 外部共有（ドメイン外） (+20点)
+  // 2. 外部共有（ドメイン外） (+20点、外部オーナーは減算)
   if (hasExternalSharing(file, organizationDomain)) {
-    const points = 20;
+    const basePoints = 20;
+    const points = Math.round(basePoints * ownerMultiplier);
     score += points;
     issues.push({
       type: 'external_sharing',
-      severity: 'high',
+      severity: internalOwner ? 'high' : 'low',
       points,
-      description: '組織外のユーザーとファイルを共有中',
+      description: internalOwner
+        ? '組織外のユーザーとファイルを共有中'
+        : '組織外のユーザーとファイルを共有中（外部所有）',
     });
   }
 
-  // 3. 外部編集権限 (+15点)
+  // 3. 外部編集権限 (+25点、外部オーナーは減算)
   if (hasExternalEditor(file, organizationDomain)) {
-    const points = 15;
+    const basePoints = 25;
+    const points = Math.round(basePoints * ownerMultiplier);
     score += points;
     issues.push({
       type: 'external_editor',
-      severity: 'high',
+      severity: internalOwner ? 'high' : 'low',
       points,
-      description: '組織外のユーザーが編集可能',
+      description: internalOwner
+        ? '組織外のユーザーが編集可能'
+        : '組織外のユーザーが編集可能（外部所有）',
+    });
+  }
+
+  // 追加: 外部ファイルに自社メンバーが編集者として参加 (+10点)
+  // 社内情報を書き込む可能性があるため
+  if (!internalOwner && hasInternalEditor(file, organizationDomain)) {
+    const points = 10;
+    score += points;
+    issues.push({
+      type: 'internal_editor_on_external',
+      severity: 'medium',
+      points,
+      description: '外部ファイルに自社メンバーが編集権限を持っている',
     });
   }
 

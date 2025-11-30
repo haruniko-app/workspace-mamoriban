@@ -12,6 +12,38 @@ const usersRef = firestore.collection('users');
 const scansRef = firestore.collection('scans');
 
 /**
+ * Firestore Timestampを Date または ISO文字列に変換
+ */
+function toISOString(value: unknown): string | null {
+  if (!value) return null;
+  // Firestore Timestamp
+  if (typeof value === 'object' && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  // Date オブジェクト
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  // 既に文字列
+  if (typeof value === 'string') {
+    return value;
+  }
+  return null;
+}
+
+/**
+ * Scanオブジェクトのタイムスタンプをシリアライズ可能な形式に変換
+ */
+function convertScanTimestamps(scan: Scan): Scan {
+  return {
+    ...scan,
+    startedAt: toISOString(scan.startedAt) as unknown as Date,
+    completedAt: toISOString(scan.completedAt) as unknown as Date,
+    createdAt: toISOString(scan.createdAt) as unknown as Date,
+  };
+}
+
+/**
  * 組織関連の操作
  */
 export const OrganizationService = {
@@ -172,7 +204,7 @@ export const ScanService = {
   async getById(id: string): Promise<Scan | null> {
     const doc = await scansRef.doc(id).get();
     if (!doc.exists) return null;
-    return doc.data() as Scan;
+    return convertScanTimestamps(doc.data() as Scan);
   },
 
   async getByOrganization(organizationId: string, limit = 10): Promise<Scan[]> {
@@ -181,7 +213,7 @@ export const ScanService = {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
-    return snapshot.docs.map((doc) => doc.data() as Scan);
+    return snapshot.docs.map((doc) => convertScanTimestamps(doc.data() as Scan));
   },
 
   async update(id: string, data: Partial<Scan>): Promise<void> {
@@ -193,12 +225,16 @@ export const ScanService = {
     result: {
       totalFiles: number;
       riskySummary: Scan['riskySummary'];
+      phase?: Scan['phase'];
+      processedFiles?: number;
     }
   ): Promise<void> {
     await scansRef.doc(id).update({
       status: 'completed',
       totalFiles: result.totalFiles,
       riskySummary: result.riskySummary,
+      phase: result.phase || 'done',
+      processedFiles: result.processedFiles ?? result.totalFiles,
       completedAt: new Date(),
     });
   },
@@ -270,17 +306,26 @@ export const ScannedFileService = {
       limit?: number;
       offset?: number;
       riskLevel?: 'critical' | 'high' | 'medium' | 'low';
+      ownerType?: 'all' | 'internal' | 'external';
       sortBy?: 'riskScore' | 'name' | 'modifiedTime';
       sortOrder?: 'asc' | 'desc';
     } = {}
   ): Promise<{ files: ScannedFile[]; total: number }> {
-    const { limit = 20, offset = 0, riskLevel, sortBy = 'riskScore', sortOrder = 'desc' } = options;
+    const { limit = 20, offset = 0, riskLevel, ownerType = 'all', sortBy = 'riskScore', sortOrder = 'desc' } = options;
     const filesRef = scansRef.doc(scanId).collection('files');
+
+    // フィルター有無を判定
+    const hasFilter = riskLevel || (ownerType && ownerType !== 'all');
 
     // カウント用クエリ
     let countQuery: FirebaseFirestore.Query = filesRef;
     if (riskLevel) {
       countQuery = countQuery.where('riskLevel', '==', riskLevel);
+    }
+    if (ownerType === 'internal') {
+      countQuery = countQuery.where('isInternalOwner', '==', true);
+    } else if (ownerType === 'external') {
+      countQuery = countQuery.where('isInternalOwner', '==', false);
     }
     const countSnapshot = await countQuery.count().get();
     const total = countSnapshot.data().count;
@@ -292,16 +337,19 @@ export const ScannedFileService = {
 
     // データ取得用クエリ
     // Note: Firestoreで where + orderBy を使う場合、複合インデックスが必要
-    // riskLevelでフィルター時はソートなしで取得し、メモリ上でソート
+    // フィルター時はソートなしで取得し、メモリ上でソート
     let dataQuery: FirebaseFirestore.Query = filesRef;
     if (riskLevel) {
       dataQuery = dataQuery.where('riskLevel', '==', riskLevel);
-    } else {
-      dataQuery = dataQuery.orderBy(sortBy, sortOrder);
+    }
+    if (ownerType === 'internal') {
+      dataQuery = dataQuery.where('isInternalOwner', '==', true);
+    } else if (ownerType === 'external') {
+      dataQuery = dataQuery.where('isInternalOwner', '==', false);
     }
 
-    // riskLevelフィルター時はページネーションを手動で行う
-    if (riskLevel) {
+    // フィルター時はページネーションを手動で行う
+    if (hasFilter) {
       // 全件取得してメモリ上でソート・ページネーション
       const allDocs = await dataQuery.get();
       let allFiles = allDocs.docs.map((doc) => doc.data() as ScannedFile);
@@ -321,7 +369,7 @@ export const ScannedFileService = {
       return { files, total };
     }
 
-    dataQuery = dataQuery.offset(offset).limit(limit);
+    dataQuery = dataQuery.orderBy(sortBy, sortOrder).offset(offset).limit(limit);
     const snapshot = await dataQuery.get();
     const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
 
@@ -357,6 +405,183 @@ export const ScannedFileService = {
       low: low.data().count,
     };
   },
+
+  /**
+   * フォルダごとにファイルを集計
+   */
+  async getByFolder(
+    scanId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      minRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+    } = {}
+  ): Promise<{
+    folders: FolderSummary[];
+    total: number;
+  }> {
+    const { limit = 20, offset = 0, minRiskLevel } = options;
+    const filesRef = scansRef.doc(scanId).collection('files');
+
+    // リスクレベルに応じてフィルタ
+    let query: FirebaseFirestore.Query = filesRef;
+    if (minRiskLevel) {
+      const riskLevels = getRiskLevelsAbove(minRiskLevel);
+      if (riskLevels.length > 0) {
+        query = query.where('riskLevel', 'in', riskLevels);
+      }
+    }
+
+    // 全ファイルを取得してメモリ上でグループ化
+    const snapshot = await query.get();
+    const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+
+    // フォルダごとにグループ化
+    const folderMap = new Map<string, {
+      id: string;
+      name: string;
+      files: ScannedFile[];
+    }>();
+
+    for (const file of files) {
+      const folderId = file.parentFolderId || 'root';
+      const folderName = file.parentFolderName || 'マイドライブ';
+
+      if (!folderMap.has(folderId)) {
+        folderMap.set(folderId, {
+          id: folderId,
+          name: folderName,
+          files: [],
+        });
+      }
+      folderMap.get(folderId)!.files.push(file);
+    }
+
+    // フォルダサマリーを作成
+    const folders: FolderSummary[] = [];
+    for (const [folderId, folder] of folderMap) {
+      const riskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+      let totalRiskScore = 0;
+      let highestRiskScore = 0;
+
+      for (const file of folder.files) {
+        riskySummary[file.riskLevel]++;
+        totalRiskScore += file.riskScore;
+        if (file.riskScore > highestRiskScore) {
+          highestRiskScore = file.riskScore;
+        }
+      }
+
+      // 最高リスクレベルを決定
+      let highestRiskLevel: 'critical' | 'high' | 'medium' | 'low' = 'low';
+      if (riskySummary.critical > 0) highestRiskLevel = 'critical';
+      else if (riskySummary.high > 0) highestRiskLevel = 'high';
+      else if (riskySummary.medium > 0) highestRiskLevel = 'medium';
+
+      folders.push({
+        id: folderId,
+        name: folder.name,
+        fileCount: folder.files.length,
+        riskySummary,
+        highestRiskLevel,
+        totalRiskScore,
+      });
+    }
+
+    // リスクスコア合計の降順でソート
+    folders.sort((a, b) => b.totalRiskScore - a.totalRiskScore);
+
+    // ページネーション
+    const total = folders.length;
+    const paginatedFolders = folders.slice(offset, offset + limit);
+
+    return { folders: paginatedFolders, total };
+  },
+
+  /**
+   * 特定フォルダ内のファイル一覧を取得
+   */
+  async getByFolderId(
+    scanId: string,
+    folderId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      sortBy?: 'riskScore' | 'name' | 'modifiedTime';
+      sortOrder?: 'asc' | 'desc';
+    } = {}
+  ): Promise<{ files: ScannedFile[]; total: number }> {
+    const { limit = 20, offset = 0, sortBy = 'riskScore', sortOrder = 'desc' } = options;
+    const filesRef = scansRef.doc(scanId).collection('files');
+
+    // フォルダIDでフィルタ
+    const isRoot = folderId === 'root';
+    let query: FirebaseFirestore.Query = filesRef;
+
+    if (isRoot) {
+      query = query.where('parentFolderId', '==', null);
+    } else {
+      query = query.where('parentFolderId', '==', folderId);
+    }
+
+    // 全件取得してメモリ上でソート・ページネーション
+    const snapshot = await query.get();
+    let files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+    const total = files.length;
+
+    // ソート
+    files.sort((a, b) => {
+      const aVal = a[sortBy as keyof ScannedFile] as string | number;
+      const bVal = b[sortBy as keyof ScannedFile] as string | number;
+      if (sortOrder === 'desc') {
+        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+      }
+      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    });
+
+    // ページネーション
+    files = files.slice(offset, offset + limit);
+
+    return { files, total };
+  },
+
+  /**
+   * ファイルの権限情報を更新
+   */
+  async updatePermissions(
+    scanId: string,
+    fileId: string,
+    permissions: ScannedFile['permissions']
+  ): Promise<void> {
+    const fileRef = scansRef.doc(scanId).collection('files').doc(fileId);
+    await fileRef.update({ permissions });
+  },
 };
+
+/**
+ * 指定されたリスクレベル以上のリスクレベル一覧を返す
+ */
+function getRiskLevelsAbove(minLevel: 'critical' | 'high' | 'medium' | 'low'): string[] {
+  const levels: Array<'critical' | 'high' | 'medium' | 'low'> = ['critical', 'high', 'medium', 'low'];
+  const index = levels.indexOf(minLevel);
+  return levels.slice(0, index + 1);
+}
+
+/**
+ * フォルダサマリー型
+ */
+export interface FolderSummary {
+  id: string;
+  name: string;
+  fileCount: number;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  highestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+  totalRiskScore: number;
+}
 
 export { firestore };

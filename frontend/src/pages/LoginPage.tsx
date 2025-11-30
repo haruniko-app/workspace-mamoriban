@@ -113,7 +113,11 @@ export function LoginPage() {
                   <p className="text-sm text-red-700">
                     {error === 'auth_failed'
                       ? '認証に失敗しました。もう一度お試しください。'
-                      : `エラーが発生しました: ${error}`}
+                      : error === 'access_denied'
+                      ? 'ログインがキャンセルされました。'
+                      : error === 'no_organization'
+                      ? '組織情報が見つかりませんでした。Google Workspace管理者にお問い合わせください。'
+                      : '認証中にエラーが発生しました。もう一度お試しください。'}
                   </p>
                 </div>
               )}
@@ -164,11 +168,7 @@ export function LoginPage() {
             </div>
 
             <p className="mt-6 text-xs text-center text-gray-500">
-              ログインすることで、
-              <a href="#" className="text-blue-600 hover:underline">利用規約</a>
-              と
-              <a href="#" className="text-blue-600 hover:underline">プライバシーポリシー</a>
-              に同意したものとみなされます
+              ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます
             </p>
           </div>
         </div>
@@ -176,13 +176,8 @@ export function LoginPage() {
 
       {/* Footer */}
       <footer className="px-6 py-4 border-t border-gray-200">
-        <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+        <div className="flex items-center justify-center text-sm text-gray-500 mb-2">
           <span>&copy; 2025 Haruniko Inc.</span>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-gray-700">ヘルプ</a>
-            <a href="#" className="hover:text-gray-700">プライバシー</a>
-            <a href="#" className="hover:text-gray-700">利用規約</a>
-          </div>
         </div>
         <p className="text-xs text-gray-400 text-center">
           Google Workspace、Google Drive、Gmail は Google LLC の商標です。本サービスは Google LLC が提供・承認するものではありません。

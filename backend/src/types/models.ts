@@ -55,7 +55,9 @@ export interface Scan {
 
   // スキャン結果サマリー
   status: 'running' | 'completed' | 'failed';
-  totalFiles: number;
+  phase: 'counting' | 'scanning' | 'done';  // スキャンフェーズ
+  totalFiles: number;              // 総ファイル数（カウント完了後に確定）
+  processedFiles: number;          // 処理済みファイル数
   riskySummary: {
     critical: number;              // 80-100点
     high: number;                  // 60-79点
@@ -88,6 +90,11 @@ export interface ScannedFile {
   // 所有者情報
   ownerEmail: string;
   ownerName: string;
+  isInternalOwner: boolean;        // オーナーが組織内メンバーか
+
+  // 親フォルダ情報
+  parentFolderId: string | null;   // 親フォルダのID
+  parentFolderName: string | null; // 親フォルダ名
 
   // 共有状態
   shared: boolean;

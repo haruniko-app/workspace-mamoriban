@@ -92,6 +92,7 @@ export const scanApi = {
     limit?: number;
     offset?: number;
     riskLevel?: 'critical' | 'high' | 'medium' | 'low';
+    ownerType?: 'all' | 'internal' | 'external';
     sortBy?: 'riskScore' | 'name' | 'modifiedTime';
     sortOrder?: 'asc' | 'desc';
   }) => {
@@ -99,11 +100,36 @@ export const scanApi = {
     if (options?.limit) params.limit = String(options.limit);
     if (options?.offset) params.offset = String(options.offset);
     if (options?.riskLevel) params.riskLevel = options.riskLevel;
+    if (options?.ownerType) params.ownerType = options.ownerType;
     if (options?.sortBy) params.sortBy = options.sortBy;
     if (options?.sortOrder) params.sortOrder = options.sortOrder;
     return api.get<{ files: ScannedFile[]; pagination: Pagination }>(`/api/scan/${scanId}/files`, { params });
   },
   getFile: (scanId: string, fileId: string) => api.get<{ file: ScannedFile }>(`/api/scan/${scanId}/files/${fileId}`),
+  getFolders: (scanId: string, options?: {
+    limit?: number;
+    offset?: number;
+    minRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+  }) => {
+    const params: Record<string, string> = {};
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.offset) params.offset = String(options.offset);
+    if (options?.minRiskLevel) params.minRiskLevel = options.minRiskLevel;
+    return api.get<{ folders: FolderSummary[]; pagination: Pagination }>(`/api/scan/${scanId}/folders`, { params });
+  },
+  getFolderFiles: (scanId: string, folderId: string, options?: {
+    limit?: number;
+    offset?: number;
+    sortBy?: 'riskScore' | 'name' | 'modifiedTime';
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const params: Record<string, string> = {};
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.offset) params.offset = String(options.offset);
+    if (options?.sortBy) params.sortBy = options.sortBy;
+    if (options?.sortOrder) params.sortOrder = options.sortOrder;
+    return api.get<{ files: ScannedFile[]; pagination: Pagination }>(`/api/scan/${scanId}/folders/${folderId}/files`, { params });
+  },
 };
 
 // Types
@@ -138,7 +164,9 @@ export interface Scan {
   organizationId: string;
   userId: string;
   status: 'running' | 'completed' | 'failed';
+  phase: 'counting' | 'scanning' | 'done';
   totalFiles: number;
+  processedFiles: number;
   riskySummary: {
     critical: number;
     high: number;
@@ -163,6 +191,9 @@ export interface ScannedFile {
   size: string | null;
   ownerEmail: string;
   ownerName: string;
+  isInternalOwner: boolean;
+  parentFolderId: string | null;
+  parentFolderName: string | null;
   shared: boolean;
   permissions: {
     id: string;
@@ -184,6 +215,20 @@ export interface Pagination {
   limit: number;
   offset: number;
   hasMore: boolean;
+}
+
+export interface FolderSummary {
+  id: string;
+  name: string;
+  fileCount: number;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  highestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+  totalRiskScore: number;
 }
 
 export interface OrganizationMember {

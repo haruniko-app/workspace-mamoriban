@@ -10,7 +10,7 @@ import {
   PLAN_CONFIG,
   type PlanType,
 } from '../services/stripe.js';
-import { OrganizationService, UserService } from '../services/firestore.js';
+import { OrganizationService, UserService, ScanService } from '../services/firestore.js';
 
 const router = Router();
 
@@ -45,9 +45,18 @@ router.get('/subscription', requireAuth, async (req: Request, res: Response) => 
     const subscription = await getActiveSubscription(organization);
     const planInfo = getPlanInfo(organization.plan);
 
-    // 今月のスキャン回数を計算（簡易版 - 実際はスキャン履歴から計算）
+    // 今月のスキャン回数を計算
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+
+    const recentScans = await ScanService.getByOrganization(organization.id, 100);
+    const monthlyScans = recentScans.filter(
+      (scan) => new Date(scan.createdAt) >= thisMonth
+    );
+
     const users = await UserService.getByOrganization(organization.id);
-    const limits = checkPlanLimits(organization.plan, users.length, organization.totalScans);
+    const limits = checkPlanLimits(organization.plan, users.length, monthlyScans.length);
 
     res.json({
       plan: organization.plan,
@@ -85,10 +94,14 @@ router.post('/checkout', requireAuth, requireAdmin, async (req: Request, res: Re
       return res.status(404).json({ error: '組織が見つかりません' });
     }
 
-    // 既に有料プランの場合はポータルに誘導
-    if (organization.plan !== 'free') {
+    // プランの順序を確認（上位プランへのアップグレードのみ許可）
+    const planOrder = ['free', 'basic', 'pro', 'enterprise'];
+    const currentPlanIndex = planOrder.indexOf(organization.plan);
+    const targetPlanIndex = planOrder.indexOf(plan);
+
+    if (targetPlanIndex <= currentPlanIndex) {
       return res.status(400).json({
-        error: '既にプランに加入しています。プラン変更はカスタマーポータルから行ってください。',
+        error: '現在のプランと同じか下位のプランにはチェックアウトできません。プラン変更はカスタマーポータルから行ってください。',
       });
     }
 

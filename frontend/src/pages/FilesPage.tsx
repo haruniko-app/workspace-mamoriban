@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { scanApi, type ScannedFile } from '../lib/api';
+import { scanApi, type ScannedFile, type FolderSummary } from '../lib/api';
 import { Layout } from '../components/Layout';
 
 type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
+type OwnerType = 'all' | 'internal' | 'external';
+type ViewMode = 'files' | 'folders';
 
 const RISK_LEVEL_CONFIG: Record<RiskLevel, { label: string; color: string; bgColor: string; borderColor: string }> = {
   critical: { label: '緊急', color: 'text-[#c5221f]', bgColor: 'bg-[#fce8e6]', borderColor: 'border-[#c5221f]' },
@@ -74,11 +76,11 @@ function FileDetailModal({ file, onClose }: { file: ScannedFile; onClose: () => 
               <h3 className="text-sm font-medium text-[#202124] mb-3">検出されたリスク</h3>
               <div className="space-y-2">
                 {file.riskFactors.map((factor, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-[#fce8e6] rounded-lg">
-                    <svg className="w-5 h-5 text-[#c5221f] flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+                  <div key={index} className={`flex items-start gap-3 p-3 ${config.bgColor} rounded-lg`}>
+                    <svg className={`w-5 h-5 ${config.color} flex-shrink-0 mt-0.5`} viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                     </svg>
-                    <span className="text-sm text-[#c5221f]">{factor}</span>
+                    <span className={`text-sm ${config.color}`}>{factor}</span>
                   </div>
                 ))}
               </div>
@@ -194,7 +196,14 @@ function FileRow({ file, onClick }: { file: ScannedFile; onClick: () => void }) 
       {/* Name & Owner */}
       <div className="flex-1 min-w-0">
         <p className="text-sm text-[#202124] truncate">{file.name}</p>
-        <p className="text-xs text-[#5f6368]">{file.ownerName}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs text-[#5f6368] truncate">{file.ownerName}</p>
+          {!file.isInternalOwner && (
+            <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-[#f1f3f4] text-[#5f6368] rounded">
+              外部
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Risk Badge */}
@@ -220,12 +229,144 @@ function FileRow({ file, onClick }: { file: ScannedFile; onClick: () => void }) 
   );
 }
 
+function FolderCard({
+  folder,
+  isExpanded,
+  onToggle,
+  onFileClick,
+  scanId,
+}: {
+  folder: FolderSummary;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onFileClick: (file: ScannedFile) => void;
+  scanId: string;
+}) {
+  const config = RISK_LEVEL_CONFIG[folder.highestRiskLevel];
+
+  // Fetch files for expanded folder
+  const { data: filesData, isLoading } = useQuery({
+    queryKey: ['folderFiles', scanId, folder.id],
+    queryFn: () => scanApi.getFolderFiles(scanId, folder.id, { limit: 50, sortBy: 'riskScore', sortOrder: 'desc' }),
+    enabled: isExpanded,
+  });
+
+  const files = filesData?.files || [];
+
+  return (
+    <div className={`border border-[#dadce0] rounded-xl overflow-hidden ${isExpanded ? 'ring-2 ring-[#1a73e8]' : ''}`}>
+      {/* Folder Header */}
+      <div
+        onClick={onToggle}
+        className="flex items-center gap-4 p-4 bg-white hover:bg-[#f8f9fa] cursor-pointer"
+      >
+        {/* Folder Icon */}
+        <div className="w-10 h-10 bg-[#f1f3f4] rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+          </svg>
+        </div>
+
+        {/* Folder Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[#202124] truncate">{folder.name}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-[#5f6368]">{folder.fileCount}件のファイル</span>
+            <span className="text-xs text-[#5f6368]">•</span>
+            <div className="flex items-center gap-1 text-xs">
+              {folder.riskySummary.critical > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-[#fce8e6] text-[#c5221f]">
+                  緊急 {folder.riskySummary.critical}
+                </span>
+              )}
+              {folder.riskySummary.high > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-[#fef7e0] text-[#e37400]">
+                  高 {folder.riskySummary.high}
+                </span>
+              )}
+              {folder.riskySummary.medium > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-[#fef7e0] text-[#f9ab00]">
+                  中 {folder.riskySummary.medium}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Risk Badge */}
+        <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${config.bgColor} ${config.color}`}>
+          {config.label}
+        </div>
+
+        {/* Expand Icon */}
+        <svg
+          className={`w-5 h-5 text-[#5f6368] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+        </svg>
+      </div>
+
+      {/* Expanded Files */}
+      {isExpanded && (
+        <div className="border-t border-[#dadce0] bg-[#f8f9fa]">
+          {isLoading ? (
+            <div className="p-4 text-center">
+              <svg className="w-6 h-6 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          ) : files.length === 0 ? (
+            <div className="p-4 text-center text-sm text-[#5f6368]">
+              ファイルがありません
+            </div>
+          ) : (
+            <div className="divide-y divide-[#e8eaed]">
+              {files.map((file) => (
+                <FileRow key={file.id} file={file} onClick={() => onFileClick(file)} />
+              ))}
+            </div>
+          )}
+
+          {/* Drive Link */}
+          {folder.id !== 'root' && (
+            <div className="p-3 border-t border-[#e8eaed]">
+              <a
+                href={`https://drive.google.com/drive/folders/${folder.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-[#1a73e8] hover:underline"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                </svg>
+                Google Driveで開く
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FilesPage() {
-  const { scanId } = useParams<{ scanId: string }>();
+  const { scanId: paramScanId } = useParams<{ scanId: string }>();
+  const [searchParams] = useSearchParams();
+  const queryScanId = searchParams.get('scanId');
+  // URLパラメータとクエリパラメータの両方をサポート
+  const scanId = paramScanId || queryScanId;
+
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<ScannedFile | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('files');
   const [riskLevelFilter, setRiskLevelFilter] = useState<RiskLevel | 'all'>('all');
+  const [ownerTypeFilter, setOwnerTypeFilter] = useState<OwnerType>('all');
   const [offset, setOffset] = useState(0);
+  const [folderOffset, setFolderOffset] = useState(0);
+  const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
   const limit = 20;
 
   // Get scan info
@@ -237,19 +378,34 @@ export function FilesPage() {
 
   // Get files
   const { data: filesData, isLoading, isError } = useQuery({
-    queryKey: ['scanFiles', scanId, riskLevelFilter, offset],
+    queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, offset],
     queryFn: () =>
       scanApi.getFiles(scanId!, {
         limit,
         offset,
         riskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
+        ownerType: ownerTypeFilter === 'all' ? undefined : ownerTypeFilter,
       }),
-    enabled: !!scanId,
+    enabled: !!scanId && viewMode === 'files',
+  });
+
+  // Get folders
+  const { data: foldersData, isLoading: isFoldersLoading, isError: isFoldersError } = useQuery({
+    queryKey: ['scanFolders', scanId, riskLevelFilter, folderOffset],
+    queryFn: () =>
+      scanApi.getFolders(scanId!, {
+        limit,
+        offset: folderOffset,
+        minRiskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
+      }),
+    enabled: !!scanId && viewMode === 'folders',
   });
 
   const scan = scanData?.scan;
   const files = filesData?.files || [];
   const pagination = filesData?.pagination;
+  const folders = foldersData?.folders || [];
+  const folderPagination = foldersData?.pagination;
 
   return (
     <Layout>
@@ -302,16 +458,93 @@ export function FilesPage() {
           </div>
         )}
 
+        {/* View Mode Toggle & Owner Type Filter */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 bg-[#f1f3f4] rounded-lg p-1">
+            <button
+              onClick={() => {
+                setViewMode('files');
+                setOffset(0);
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === 'files'
+                  ? 'bg-white text-[#202124] shadow-sm'
+                  : 'text-[#5f6368] hover:text-[#202124]'
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+              </svg>
+              ファイル
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('folders');
+                setFolderOffset(0);
+                setExpandedFolderId(null);
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === 'folders'
+                  ? 'bg-white text-[#202124] shadow-sm'
+                  : 'text-[#5f6368] hover:text-[#202124]'
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+              </svg>
+              フォルダ
+            </button>
+          </div>
+
+          {/* Owner Type Filter (only for files view) */}
+          {viewMode === 'files' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#5f6368]">所有者:</span>
+              <div className="flex gap-1">
+                {(['all', 'internal', 'external'] as OwnerType[]).map((type) => {
+                  const label = type === 'all' ? 'すべて' : type === 'internal' ? '自社' : '外部';
+                  const isActive = ownerTypeFilter === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setOwnerTypeFilter(type);
+                        setOffset(0);
+                      }}
+                      className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
+                        isActive
+                          ? 'bg-[#1a73e8] text-white'
+                          : 'bg-[#f1f3f4] text-[#5f6368] hover:bg-[#e8eaed]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Filter info */}
-        {riskLevelFilter !== 'all' && (
-          <div className="flex items-center gap-2">
+        {(riskLevelFilter !== 'all' || ownerTypeFilter !== 'all') && (
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm text-[#5f6368]">フィルター:</span>
-            <span className={`px-2 py-1 rounded text-xs font-medium ${RISK_LEVEL_CONFIG[riskLevelFilter].bgColor} ${RISK_LEVEL_CONFIG[riskLevelFilter].color}`}>
-              {RISK_LEVEL_CONFIG[riskLevelFilter].label}
-            </span>
+            {riskLevelFilter !== 'all' && (
+              <span className={`px-2 py-1 rounded text-xs font-medium ${RISK_LEVEL_CONFIG[riskLevelFilter].bgColor} ${RISK_LEVEL_CONFIG[riskLevelFilter].color}`}>
+                {RISK_LEVEL_CONFIG[riskLevelFilter].label}
+              </span>
+            )}
+            {ownerTypeFilter !== 'all' && (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-[#e8f0fe] text-[#1a73e8]">
+                {ownerTypeFilter === 'internal' ? '自社所有' : '外部所有'}
+              </span>
+            )}
             <button
               onClick={() => {
                 setRiskLevelFilter('all');
+                setOwnerTypeFilter('all');
                 setOffset(0);
               }}
               className="text-sm text-[#1a73e8] hover:underline"
@@ -321,76 +554,148 @@ export function FilesPage() {
           </div>
         )}
 
-        {/* File List */}
-        <div className="bg-white rounded-xl border border-[#dadce0] overflow-hidden">
-          {/* Table header */}
-          <div className="flex items-center gap-4 px-4 py-3 bg-[#f8f9fa] border-b border-[#e8eaed] text-xs text-[#5f6368] font-medium">
-            <div className="w-6" />
-            <div className="flex-1">ファイル名</div>
-            <div className="w-14 text-center">リスク</div>
-            <div className="w-12 text-right">スコア</div>
-            <div className="w-16 text-right">問題数</div>
-            <div className="w-5" />
-          </div>
+        {/* Content based on view mode */}
+        {viewMode === 'files' ? (
+          <>
+            {/* File List */}
+            <div className="bg-white rounded-xl border border-[#dadce0] overflow-hidden">
+              {/* Table header */}
+              <div className="flex items-center gap-4 px-4 py-3 bg-[#f8f9fa] border-b border-[#e8eaed] text-xs text-[#5f6368] font-medium">
+                <div className="w-6" />
+                <div className="flex-1">ファイル名</div>
+                <div className="w-14 text-center">リスク</div>
+                <div className="w-12 text-right">スコア</div>
+                <div className="w-16 text-right">問題数</div>
+                <div className="w-5" />
+              </div>
 
-          {isLoading ? (
-            <div className="p-8 text-center">
-              <svg className="w-8 h-8 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <p className="mt-2 text-sm text-[#5f6368]">読み込み中...</p>
+              {isLoading ? (
+                <div className="p-8 text-center">
+                  <svg className="w-8 h-8 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <p className="mt-2 text-sm text-[#5f6368]">読み込み中...</p>
+                </div>
+              ) : isError ? (
+                <div className="p-8 text-center">
+                  <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                  </svg>
+                  <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+                </div>
+              ) : files.length === 0 ? (
+                <div className="p-8 text-center">
+                  <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
+                  </svg>
+                  <p className="mt-2 text-sm text-[#5f6368]">該当するファイルがありません</p>
+                </div>
+              ) : (
+                <div>
+                  {files.map((file) => (
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      onClick={() => setSelectedFile(file)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : isError ? (
-            <div className="p-8 text-center">
-              <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-              </svg>
-              <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
-            </div>
-          ) : files.length === 0 ? (
-            <div className="p-8 text-center">
-              <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
-              </svg>
-              <p className="mt-2 text-sm text-[#5f6368]">該当するファイルがありません</p>
-            </div>
-          ) : (
-            <div>
-              {files.map((file) => (
-                <FileRow
-                  key={file.id}
-                  file={file}
-                  onClick={() => setSelectedFile(file)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Pagination */}
-        {pagination && pagination.total > limit && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[#5f6368]">
-              {offset + 1} - {Math.min(offset + files.length, pagination.total)} / {pagination.total}件
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-                disabled={offset === 0}
-                className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                前へ
-              </button>
-              <button
-                onClick={() => setOffset(offset + limit)}
-                disabled={!pagination.hasMore}
-                className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                次へ
-              </button>
-            </div>
-          </div>
+            {/* Files Pagination */}
+            {pagination && pagination.total > limit && (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#5f6368]">
+                  {offset + 1} - {Math.min(offset + files.length, pagination.total)} / {pagination.total}件
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setOffset(Math.max(0, offset - limit))}
+                    disabled={offset === 0}
+                    className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    前へ
+                  </button>
+                  <button
+                    onClick={() => setOffset(offset + limit)}
+                    disabled={!pagination.hasMore}
+                    className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    次へ
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Folder View */}
+            {isFoldersLoading ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
+                <svg className="w-8 h-8 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <p className="mt-2 text-sm text-[#5f6368]">読み込み中...</p>
+              </div>
+            ) : isFoldersError ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
+                <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                </svg>
+                <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+              </div>
+            ) : folders.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
+                <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                </svg>
+                <p className="mt-2 text-sm text-[#5f6368]">該当するフォルダがありません</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {folders.map((folder) => (
+                  <FolderCard
+                    key={folder.id}
+                    folder={folder}
+                    isExpanded={expandedFolderId === folder.id}
+                    onToggle={() => setExpandedFolderId(
+                      expandedFolderId === folder.id ? null : folder.id
+                    )}
+                    onFileClick={setSelectedFile}
+                    scanId={scanId!}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Folders Pagination */}
+            {folderPagination && folderPagination.total > limit && (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#5f6368]">
+                  {folderOffset + 1} - {Math.min(folderOffset + folders.length, folderPagination.total)} / {folderPagination.total}フォルダ
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFolderOffset(Math.max(0, folderOffset - limit))}
+                    disabled={folderOffset === 0}
+                    className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    前へ
+                  </button>
+                  <button
+                    onClick={() => setFolderOffset(folderOffset + limit)}
+                    disabled={!folderPagination.hasMore}
+                    className="px-4 py-2 text-sm font-medium text-[#1a73e8] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    次へ
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

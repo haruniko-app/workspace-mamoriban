@@ -7,7 +7,7 @@ const SCOPES = [
   'openid',
   'email',
   'profile',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive', // 読み取り+権限変更に必要
   'https://www.googleapis.com/auth/admin.directory.user.readonly',
 ];
 
@@ -27,12 +27,16 @@ function getOAuth2Client(): OAuth2Client {
 
 /**
  * 認証URLを生成
+ * @param forceConsent 強制的に同意画面を表示する（refresh tokenを再取得したい場合）
  */
-export function generateAuthUrl(): string {
+export function generateAuthUrl(forceConsent = false): string {
   return getOAuth2Client().generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    prompt: 'consent', // refresh tokenを確実に取得
+    // forceConsentがtrueの場合のみconsentを強制、それ以外はGoogleに判断させる
+    // prompt: 'select_account'だとアカウント選択画面のみ表示される
+    prompt: forceConsent ? 'consent' : 'select_account',
+    include_granted_scopes: true, // 既に許可されたスコープを含める
   });
 }
 

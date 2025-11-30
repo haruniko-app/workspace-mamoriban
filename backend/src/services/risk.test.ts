@@ -23,6 +23,7 @@ function createMockFile(overrides: Partial<DriveFile> = {}): DriveFile {
     sharingUser: null,
     shared: false,
     permissions: [],
+    parents: [],
     ...overrides,
   };
 }

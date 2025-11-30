@@ -80,47 +80,47 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
-      {/* Google Drive style header */}
-      <header className="h-16 bg-white border-b border-[#dadce0] flex items-center px-2 sticky top-0 z-50">
-        {/* Left section - Logo */}
-        <div className="flex items-center min-w-[200px]">
-          {/* Mobile menu button */}
+      {/* Google Drive style header - 64px height, exact Google styling */}
+      <header className="h-16 bg-white border-b border-[#dadce0] flex items-center sticky top-0 z-50">
+        {/* Left section - Menu + Logo (padding-left: 8px like Google) */}
+        <div className="flex items-center pl-2">
+          {/* Mobile menu button - 48x48 touch target */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-3 rounded-full hover:bg-[#f1f3f4] transition-colors mr-1"
+            className="lg:hidden w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#f1f3f4] transition-colors"
             aria-label="メニュー"
           >
             <MenuIcon className="w-6 h-6 text-[#5f6368]" />
           </button>
 
-          {/* Logo */}
-          <Link to="/dashboard" className="flex items-center gap-2">
+          {/* Logo - Google uses 40x40 product icon + 22px product name */}
+          <Link to="/dashboard" className="flex items-center gap-2 pl-2 pr-4">
             <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
-              <rect width="48" height="48" rx="8" fill="#1a73e8" />
+              <rect width="48" height="48" rx="12" fill="#1a73e8" />
               <path
-                d="M24 8L12 15v13c0 8.4 5.1 16.3 12 18.5 6.9-2.2 12-10.1 12-18.5V15l-12-7z"
+                d="M24 10L14 16v12c0 7.2 4.3 13.8 10 15.5 5.7-1.7 10-8.3 10-15.5V16l-10-6z"
                 fill="white"
               />
               <path
-                d="M20 24l3 3 6-6"
+                d="M21 26l2.5 2.5 5-5"
                 stroke="#1a73e8"
-                strokeWidth="2.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
-            <span className="text-[22px] text-[#5f6368] hidden sm:block">
+            <span className="text-[22px] text-[#5f6368] tracking-[-0.01em] hidden sm:block whitespace-nowrap">
               Workspace守り番
             </span>
           </Link>
         </div>
 
-        {/* Center - Search bar (Google Drive style) */}
-        <div className="flex-1 max-w-[720px] mx-4 hidden md:block">
+        {/* Center - Search bar (Google Drive: max-width 720px, height 46px) */}
+        <div className="flex-1 max-w-[720px] mx-auto px-4 hidden md:block">
           <div className="relative">
-            <div className="flex items-center h-12 bg-[#f1f3f4] rounded-full hover:bg-[#e8eaed] hover:shadow-sm focus-within:bg-white focus-within:shadow-md transition-all">
-              <div className="pl-4 pr-2 flex items-center">
-                <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+            <div className="flex items-center h-[46px] bg-[#f1f3f4] rounded-full hover:bg-white hover:shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] focus-within:bg-white focus-within:shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] transition-all">
+              <div className="pl-3 pr-1 flex items-center">
+                <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
                 </svg>
               </div>
@@ -129,7 +129,7 @@ export function Layout({ children }: LayoutProps) {
                 placeholder="ファイルを検索"
                 className="flex-1 h-full bg-transparent border-0 text-[16px] text-[#202124] placeholder-[#5f6368] outline-none"
               />
-              <button className="p-2 mr-2 rounded-full hover:bg-[#dadce0] transition-colors" title="検索オプション">
+              <button className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#e8eaed] transition-colors" title="検索オプション">
                 <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
                 </svg>
@@ -138,17 +138,13 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
-        {/* Right section - Icons (Google Drive order: check, help, settings, apps, avatar) */}
-        <div className="flex items-center gap-1">
-          {/* Status check icon */}
-          <button className="p-3 rounded-full hover:bg-[#f1f3f4] transition-colors hidden sm:flex" title="ステータス">
-            <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-            </svg>
-          </button>
-
-          {/* Help icon */}
-          <button className="p-3 rounded-full hover:bg-[#f1f3f4] transition-colors hidden sm:flex" title="ヘルプ">
+        {/* Right section - Icons (Google: 48x48 touch target, 16-20px right padding) */}
+        <div className="flex items-center pr-4 ml-auto">
+          {/* Help icon - Google has this */}
+          <button
+            className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#f1f3f4] transition-colors"
+            title="ヘルプ"
+          >
             <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
               <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" />
             </svg>
@@ -157,7 +153,7 @@ export function Layout({ children }: LayoutProps) {
           {/* Settings icon */}
           <button
             onClick={() => navigate('/settings')}
-            className="p-3 rounded-full hover:bg-[#f1f3f4] transition-colors hidden sm:flex"
+            className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#f1f3f4] transition-colors"
             title="設定"
           >
             <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
@@ -165,19 +161,12 @@ export function Layout({ children }: LayoutProps) {
             </svg>
           </button>
 
-          {/* Apps grid icon */}
-          <button className="p-3 rounded-full hover:bg-[#f1f3f4] transition-colors" title="Google アプリ">
-            <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 12c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0-6c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-12c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-            </svg>
-          </button>
-
-          {/* User avatar - rightmost */}
+          {/* User avatar - 48x48 touch target with 32x32 avatar inside (Google style) */}
           {user && (
-            <div className="relative ml-2">
+            <div className="relative flex items-center">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="rounded-full hover:shadow-md transition-shadow"
+                className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#f1f3f4] transition-colors"
                 title={user.email}
               >
                 {user.photoUrl ? (
@@ -197,7 +186,7 @@ export function Layout({ children }: LayoutProps) {
               {userMenuOpen && (
                 <>
                   <div className="fixed inset-0" onClick={() => setUserMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-[360px] bg-[#e8f0fe] rounded-3xl shadow-lg border border-[#dadce0] overflow-hidden z-50">
+                  <div className="absolute right-0 top-full mt-2 w-[360px] bg-[#e8f0fe] rounded-3xl shadow-lg border border-[#dadce0] overflow-hidden z-50">
                     <div className="bg-white m-2 rounded-2xl">
                       <div className="p-4 text-center border-b border-[#e8eaed]">
                         {user.photoUrl ? (

@@ -16,6 +16,7 @@ function createMockFile(permissions: DrivePermission[]): DriveFile {
     sharingUser: null,
     shared: permissions.length > 0,
     permissions,
+    parents: [],
   };
 }
 
