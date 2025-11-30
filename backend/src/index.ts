@@ -14,6 +14,8 @@ import scanRoutes from './routes/scan.js';
 import organizationRoutes from './routes/organization.js';
 import stripeRoutes from './routes/stripe.js';
 import auditLogRoutes from './routes/auditLogs.js';
+import reportRoutes from './routes/reports.js';
+import notificationRoutes from './routes/notifications.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -69,6 +71,12 @@ app.use('/api/stripe', stripeRoutes);
 
 // Audit log routes
 app.use('/api/audit-logs', auditLogRoutes);
+
+// Report routes (ISMS/Pマーク対応)
+app.use('/api/reports', reportRoutes);
+
+// Notification routes
+app.use('/api/notifications', notificationRoutes);
 
 app.listen(PORT, () => {
   console.log(`🛡️ Workspace守り番 Backend running on port ${PORT}`);

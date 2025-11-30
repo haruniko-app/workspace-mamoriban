@@ -1,6 +1,6 @@
 # Workspace守り番 開発タスク一覧
 
-**最終更新**: 2025年11月29日
+**最終更新**: 2025年11月30日
 **アーキテクチャ**: GCP + Cloud Run（本番環境対応）
 
 ---
@@ -43,8 +43,12 @@
 | Milestone 4.5: ファイル詳細・改善アクション | ✅ 完了 | 4/4 |
 | Milestone 5: 認証・決済連携 | ✅ 完了 | 4/4 |
 | Milestone 5.5: リスク評価改善 | ✅ 完了 | 3/3 |
-| Milestone 5.6: 権限管理機能 | 🔄 進行中 | 3/9 |
+| Milestone 5.6: 権限管理機能 | 🔄 進行中 | 14/21 |
+| Milestone 5.7: アクセス制御・管理者機能 | ✅ 完了 | 3/3 |
+| Milestone 5.8: ISMS/Pマーク対応レポート | ✅ 完了 | 4/4 |
 | Milestone 6: テスト・デプロイ | ⏳ 未着手 | 0/7 |
+| Milestone 7: 一括操作UI | ✅ 完了 | 4/4 |
+| Milestone 8: 通知・アラート機能 | ✅ 完了 | 4/4 |
 
 ---
 
@@ -236,41 +240,62 @@
 
 ### Phase 1: フォルダ単位表示（工数: 中）
 
-- [ ] バックエンド: 親フォルダ情報取得
-  - [ ] スキャン時に`parents`フィールドを取得
-  - [ ] 親フォルダ名をバッチで取得（API呼び出し最適化）
-  - [ ] `ScannedFile`に`parentFolderId`/`parentFolderName`追加
-- [ ] バックエンド: フォルダ集計API
-  - [ ] `GET /api/scan/:scanId/folders` エンドポイント追加
-  - [ ] フォルダ別リスクサマリー集計
-- [ ] フロントエンド: フォルダビュー
+- [x] バックエンド: 親フォルダ情報取得 ✅ 実装済み
+  - [x] スキャン時に`parents`フィールドを取得
+  - [x] 親フォルダ名をバッチで取得（API呼び出し最適化）
+  - [x] `ScannedFile`に`parentFolderId`/`parentFolderName`追加
+- [x] バックエンド: フォルダ集計API ✅ 実装済み
+  - [x] `GET /api/scan/:scanId/folders` エンドポイント追加
+  - [x] `GET /api/scan/:scanId/folders/:folderId/files` エンドポイント追加
+  - [x] フォルダ別リスクサマリー集計
+- [x] バックエンド: フォルダ階層・権限API ✅ 実装済み
+  - [x] `GET /api/scan/:scanId/files/:fileId/folder-path` （フォルダ階層取得）
+  - [x] `DELETE /api/scan/:scanId/folders/:folderId/permissions` （フォルダ権限一括削除）
+- [x] フロントエンド: フォルダパス表示 ✅ 実装済み
+  - [x] パンくずリスト形式でフォルダ階層表示
+  - [x] フォルダクリックで権限一覧表示
+  - [x] Google Driveへのリンク
+- [ ] フロントエンド: フォルダビュー ⏳ 未実装
   - [ ] 表示モード切替（ファイル表示/フォルダ表示）
   - [ ] フォルダ別ファイルグルーピング表示
   - [ ] フォルダ展開/折りたたみ
 
 ### Phase 2: 権限変更API（工数: 大）
 
-- [ ] OAuthスコープ変更
+- [ ] OAuthスコープ変更 ⏳ 未実装
   - [ ] `drive.readonly` → `drive` スコープに変更
   - [ ] Google Cloud Console で同意画面更新
   - [ ] 再認証フロー実装
-- [ ] バックエンド: 権限変更API
-  - [ ] `POST /api/files/:fileId/permissions/:permissionId/revoke` （権限削除）
-  - [ ] `PATCH /api/files/:fileId/permissions/:permissionId` （権限変更）
-  - [ ] `POST /api/files/bulk-permissions` （一括変更）
-- [ ] バックエンド: 監査ログ
-  - [ ] `PermissionChangeLog`データモデル追加
-  - [ ] 権限変更操作の記録
+- [x] バックエンド: ファイル権限変更API ✅ 実装済み
+  - [x] `DELETE /api/scan/:scanId/files/:fileId/permissions/:permissionId` （権限削除）
+  - [x] `PUT /api/scan/:scanId/files/:fileId/permissions/:permissionId` （権限更新）
+  - [x] `GET /api/scan/:scanId/files/:fileId/permissions` （最新権限取得）
+- [x] バックエンド: フォルダ権限一括削除API ✅ 実装済み
+  - [x] `DELETE /api/scan/:scanId/folders/:folderId/permissions` （フォルダ内一括削除）
+- [ ] バックエンド: フォルダ自体の権限変更API ⏳ 未実装
+  - [ ] `DELETE /api/scan/:scanId/folders/:folderId/folder-permissions/:permissionId` （フォルダ権限削除）
+  - [ ] `PUT /api/scan/:scanId/folders/:folderId/folder-permissions/:permissionId` （フォルダ権限更新）
+- [x] バックエンド: 監査ログ ✅ 実装済み
+  - [x] `ActionLog`データモデル追加
+  - [x] 権限変更操作の記録
+  - [x] `/api/audit-logs/actions` エンドポイント
 
 ### Phase 3: 権限変更UI（工数: 中）
 
-- [ ] フロントエンド: 単一ファイル権限変更
-  - [ ] ファイル詳細モーダルに権限変更ボタン追加
-  - [ ] 「公開リンク無効化」ボタン
-  - [ ] 「外部ユーザー削除」ボタン
-  - [ ] 「編集者→閲覧者に降格」ボタン
-  - [ ] 確認ダイアログ表示
-- [ ] フロントエンド: 一括操作
+- [x] フロントエンド: 単一ファイル権限変更 ✅ 実装済み
+  - [x] ファイル詳細モーダルに権限変更ボタン追加
+  - [x] 「アクセス削除」ボタン（ゴミ箱アイコン）
+  - [x] 「閲覧者に変更」ボタン（矢印アイコン）
+  - [x] 確認ダイアログ表示
+  - [x] 操作結果トースト表示
+  - [x] 外部オーナーファイルは変更不可の警告表示
+- [ ] フロントエンド: フォルダ権限変更 ⏳ **未実装（重要）**
+  - [ ] フォルダ権限表示に「削除」ボタン追加
+  - [ ] フォルダ権限表示に「閲覧者に変更」ボタン追加
+  - [ ] フォルダ権限変更の確認ダイアログ
+  - [ ] フォルダ権限変更APIとの連携
+  - [ ] 操作結果トースト表示
+- [ ] フロントエンド: 一括操作 ⏳ 未実装
   - [ ] ファイル複数選択UI
   - [ ] 一括アクション選択ダイアログ
   - [ ] ドライラン（プレビュー）機能
@@ -284,6 +309,68 @@
 | API レート制限 | バッチ処理、指数バックオフ、キュー制御 |
 | 誤操作防止 | 確認UI、ドライラン、監査ログ |
 | 外部オーナーファイル | 変更不可であることをUI上で明示 |
+
+---
+
+## Milestone 5.7: アクセス制御・管理者機能 ✅
+
+スキャン結果のセキュリティ強化と管理者向け機能の実装。
+
+**設計書**: `docs/DEVELOPMENT_ROADMAP.md`
+
+### 実装内容
+
+- [x] スキャン結果のアクセス制御
+  - [x] `Scan`モデルに`userEmail`, `userName`, `visibility`フィールド追加
+  - [x] ロール別アクセス制御（member: 自分のみ / admin,owner: 全件）
+  - [x] `ScanService.getAccessibleScans()`, `canAccessScan()`, `canEditScan()`追加
+  - [x] 管理者用API: `/api/scan/admin/users`, `/api/scan/admin/users/:userId/scans`, `/api/scan/admin/all`
+- [x] 管理者統合ダッシュボード
+  - [x] `AdminDashboardPage.tsx`作成
+  - [x] 組織全体のリスクサマリー表示
+  - [x] ユーザー別スキャン状況一覧
+  - [x] ユーザー詳細展開（スキャン履歴）
+  - [x] 管理者専用ナビゲーション追加
+- [x] フロントエンドAPI対応
+  - [x] `scanApi.admin`メソッド追加
+  - [x] `UserScanSummary`型定義
+
+---
+
+## Milestone 5.8: ISMS/Pマーク対応レポート ✅
+
+監査対応用のレポート機能を実装。
+
+**設計書**: `docs/ISMS_PMARK_REQUIREMENTS.md`
+
+### 実装内容
+
+- [x] バックエンド: レポートAPI
+  - [x] `GET /api/reports/scan-history` - スキャン実施履歴レポート（A.8.15, 9.2対応）
+  - [x] `GET /api/reports/risk-assessment/:scanId` - リスクアセスメントレポート（A.5.9, A.5.10, 6.1.2対応）
+  - [x] `GET /api/reports/remediation-history` - 是正対応履歴レポート（A.5.18対応）
+  - [x] `GET /api/reports/external-sharing/:scanId` - 外部共有一覧レポート（A.5.15, A.5.23対応）
+  - [x] `GET /api/reports/current-risks` - 現在のリスク状況レポート（9.1, 9.3対応）
+- [x] フロントエンド: レポートUI
+  - [x] `ReportsPage.tsx`作成
+  - [x] レポート選択カード（ISMS/Pマーク参照付き）
+  - [x] 期間・スキャン選択パラメータ
+  - [x] サマリー表示
+  - [x] JSON/CSVダウンロード
+  - [x] 審査対応チェックリスト
+- [x] ナビゲーション
+  - [x] `/reports`ルート追加
+  - [x] 管理者専用メニューに追加
+
+### 対応する監査要件
+
+| レポート | ISMS (ISO 27001:2022) | Pマーク (JIS Q 15001:2023) |
+|----------|----------------------|---------------------------|
+| スキャン実施履歴 | A.8.15 ログ取得 | 9.2 内部監査 |
+| リスクアセスメント | A.5.9, A.5.10 | 6.1.2 リスクアセスメント |
+| 是正対応履歴 | A.5.18 アクセス権 | 9.2 内部監査（是正措置） |
+| 外部共有一覧 | A.5.15, A.5.23 | - |
+| 現在のリスク状況 | 9.1 監視・測定 | 9.3 マネジメントレビュー |
 
 ---
 
@@ -733,3 +820,195 @@ Firestore
 - [権限管理機能設計書](./docs/PERMISSION_MANAGEMENT_DESIGN.md)
 - [GCP Console](https://console.cloud.google.com/home/dashboard?project=workspace-mamoriban)
 - [Firestore Console](https://console.cloud.google.com/firestore/databases?project=workspace-mamoriban)
+
+---
+
+## Milestone 7: 一括操作UI ✅
+
+複数ファイルの権限を効率的に管理するための一括操作機能。
+
+**優先度**: 中
+**完了日**: 2025年11月30日
+
+### 7-1: ファイル選択UI ✅
+
+- [x] FilesPage.tsxにチェックボックス追加
+  - [x] 各ファイル行にチェックボックス配置
+  - [x] ヘッダーに全選択/全解除チェックボックス
+  - [x] 選択状態の管理（useState）
+- [x] 選択状態の表示
+  - [x] 「X件選択中」バッジ表示
+  - [x] 選択中ファイルのハイライト表示（背景色変更）
+- [x] フィルタとの連携
+  - [x] 「すべて選択」「すべて解除」ボタン
+
+### 7-2: 一括操作メニュー ✅
+
+- [x] 選択中メニューバー
+  - [x] 「公開削除」ボタン（anyone権限を一括削除）
+  - [x] 「閲覧者に変更」ボタン（編集者→閲覧者に一括変更）
+  - [x] 「外部削除」ボタン（外部ユーザーのアクセスを一括削除）
+  - [x] 選択解除ボタン（Xアイコン）
+- [x] 操作モード切替
+  - [x] 「一括操作」ボタンで選択モードに切替
+  - [x] 管理者（admin/owner）のみ表示
+
+### 7-3: 確認・実行フロー ✅
+
+- [x] 確認ダイアログ
+  - [x] 影響を受けるファイル数の表示
+  - [x] 操作内容の説明
+  - [x] 「実行する」「キャンセル」ボタン
+- [x] 実行結果サマリー
+  - [x] 成功件数/失敗件数の表示
+  - [x] トースト通知で結果表示
+  - [x] 閉じるボタン
+
+### 7-4: バックエンドAPI ✅
+
+- [x] `POST /api/scan/:scanId/bulk/permissions/delete` - 権限を一括削除
+- [x] `POST /api/scan/:scanId/bulk/permissions/demote` - 編集者を閲覧者に一括変更
+- [x] `POST /api/scan/:scanId/bulk/remove-public-access` - anyone権限を一括削除
+- [x] レスポンス形式: `{ success, message, results: { total, success, failed, details[] } }`
+- [x] 監査ログへの記録
+  - [x] `permission_bulk_delete` / `permission_bulk_update` アクションタイプ
+  - [x] 影響を受けたファイル数の記録
+
+---
+
+## Milestone 8: 通知・アラート機能 ✅
+
+リスクを早期発見し、関係者に通知する機能。
+
+**完了日**: 2025年11月30日
+
+### 8-1: 通知設定モデルとFirestoreサービス ✅
+
+- [x] データモデル定義（`NotificationSettings`, `NotificationLog`）
+  - [x] メール通知設定（enabled, recipients, triggers, thresholds）
+  - [x] Slack通知設定（将来拡張用に型定義）
+  - [x] 通知履歴（type, channel, recipients, success）
+- [x] Firestoreサービス
+  - [x] `NotificationSettingsService` - 設定の取得・更新・受信者管理
+  - [x] `NotificationLogService` - 通知履歴の作成・取得
+
+### 8-2: 通知設定APIエンドポイント ✅
+
+- [x] `GET /api/notifications/settings` - 通知設定取得
+- [x] `PUT /api/notifications/settings` - 通知設定更新
+- [x] `POST /api/notifications/settings/recipients` - 受信者追加
+- [x] `DELETE /api/notifications/settings/recipients/:email` - 受信者削除
+- [x] `GET /api/notifications/logs` - 通知履歴取得
+- [x] `POST /api/notifications/test` - テスト通知送信
+
+### 8-3: 通知設定UIページ ✅
+
+- [x] 通知設定タブ
+  - [x] メール通知ON/OFF切り替え（トグルスイッチ）
+  - [x] 通知受信者の追加・削除
+  - [x] 通知トリガー設定（スキャン完了、Criticalリスク、Highリスク、週次レポート）
+- [x] 通知履歴タブ
+  - [x] 通知履歴一覧表示
+  - [x] タイプ別バッジ表示
+  - [x] 成功/失敗表示
+- [x] テスト通知機能
+  - [x] テスト通知送信ボタン
+  - [x] 結果表示
+- [x] ナビゲーション追加（管理者メニューに「通知設定」リンク）
+
+### 8-4: フロントエンドAPI ✅
+
+- [x] `notificationsApi` オブジェクト
+  - [x] getSettings, updateSettings, addRecipient, removeRecipient
+  - [x] getLogs, sendTestNotification
+- [x] 型定義（NotificationSettings, NotificationLog）
+
+---
+
+## 将来の機能拡張 ⏳
+
+### Domain-Wide Delegation統合スキャン
+
+管理者がサービスアカウントを使用して全ユーザーのファイルを一括スキャン。
+
+**工数見積もり**: 大
+
+- [ ] サービスアカウント設定
+  - [ ] GCPでサービスアカウント作成手順ドキュメント
+  - [ ] 必要なスコープの定義
+  - [ ] JSONキーのアップロードUI
+- [ ] Google Workspace管理コンソール設定ガイド
+  - [ ] Domain-Wide Delegation有効化手順
+  - [ ] スコープ承認手順
+  - [ ] 設定確認テスト機能
+- [ ] 統合スキャン機能
+  - [ ] 全ユーザーリストの取得（Admin SDK）
+  - [ ] ユーザーごとのimpersonationでスキャン
+  - [ ] 進捗表示（X/Y ユーザー完了）
+  - [ ] エラーハンドリング（アクセス拒否ユーザーのスキップ）
+- [ ] 結果の統合表示
+  - [ ] 全ユーザーのファイルを統合表示
+  - [ ] ユーザー別フィルター
+  - [ ] 組織全体のリスクサマリー
+
+### PDFレポート出力
+
+監査提出用のPDF形式レポート生成。
+
+**工数見積もり**: 中
+
+- [ ] PDFライブラリ導入
+  - [ ] puppeteer または pdfkit の選定
+  - [ ] バックエンドへのインストール
+  - [ ] Cloud Runでの動作確認
+- [ ] レポートテンプレート作成
+  - [ ] スキャン履歴レポートテンプレート（HTML）
+  - [ ] リスクアセスメントレポートテンプレート（HTML）
+  - [ ] 是正対応履歴レポートテンプレート（HTML）
+  - [ ] 外部共有一覧レポートテンプレート（HTML）
+  - [ ] 現在のリスク状況レポートテンプレート（HTML）
+- [ ] PDF生成機能
+  - [ ] HTML→PDF変換
+  - [ ] 署名・日付の挿入
+  - [ ] ページ番号の追加
+  - [ ] ヘッダー/フッターの設定
+- [ ] フロントエンド対応
+  - [ ] 「PDF」ダウンロードボタン追加
+  - [ ] 生成中のローディング表示
+- [ ] レポート一括ダウンロード
+  - [ ] 複数レポートのZIP圧縮
+  - [ ] ダウンロードリンクの生成
+
+### Excel (XLSX) レポート出力
+
+詳細分析用のExcel形式レポート。
+
+**工数見積もり**: 中
+
+- [ ] xlsxライブラリ導入
+  - [ ] exceljs または xlsx-js のインストール
+  - [ ] TypeScript型定義の設定
+- [ ] シート設計
+  - [ ] サマリーシート（統計情報）
+  - [ ] 詳細シート（ファイル一覧）
+  - [ ] リスク別シート（Critical/High/Medium/Low）
+- [ ] Excel機能の活用
+  - [ ] 自動フィルター設定
+  - [ ] 条件付き書式（リスクレベル別色分け）
+  - [ ] グラフの自動生成（円グラフ、棒グラフ）
+  - [ ] ハイパーリンク（Google Driveへ）
+- [ ] フロントエンド対応
+  - [ ] 「Excel」ダウンロードボタン追加
+  - [ ] フォーマット選択（CSV/Excel）
+
+### その他の将来機能
+
+- [ ] 定期スキャンスケジューラー
+  - [ ] 日次/週次/月次の自動スキャン設定
+  - [ ] Cloud Scheduler連携
+- [ ] ファイル内容スキャン（将来）
+  - [ ] 機密情報（マイナンバー、クレカ番号）の検出
+  - [ ] DLP機能との連携
+- [ ] 多言語対応
+  - [ ] 英語UI
+  - [ ] 英語レポート

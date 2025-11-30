@@ -12,6 +12,9 @@ import { FilesPage } from './pages/FilesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +90,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuditLogsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <ReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
                 </ProtectedRoute>
               }
             />

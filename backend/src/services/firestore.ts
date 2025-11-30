@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import type { Organization, User, Scan, ScannedFile } from '../types/models.js';
+import type { Organization, User, Scan, ScannedFile, ActionLog, NotificationSettings, NotificationLog } from '../types/models.js';
 
 // Firestore初期化
 const firestore = new Firestore({
@@ -10,6 +10,9 @@ const firestore = new Firestore({
 const organizationsRef = firestore.collection('organizations');
 const usersRef = firestore.collection('users');
 const scansRef = firestore.collection('scans');
+const actionLogsRef = firestore.collection('actionLogs');
+const notificationSettingsRef = firestore.collection('notificationSettings');
+const notificationLogsRef = firestore.collection('notificationLogs');
 
 /**
  * Firestore Timestampを Date または ISO文字列に変換
@@ -207,6 +210,68 @@ export const ScanService = {
     return convertScanTimestamps(doc.data() as Scan);
   },
 
+  /**
+   * ユーザーがアクセス可能なスキャン一覧を取得
+   * - member: 自分のスキャンのみ
+   * - admin/owner: 全員のスキャン
+   */
+  async getAccessibleScans(
+    organizationId: string,
+    userId: string,
+    userRole: 'owner' | 'admin' | 'member',
+    limit = 10,
+    offset = 0
+  ): Promise<{ scans: Scan[]; total: number }> {
+    let query: FirebaseFirestore.Query = scansRef.where('organizationId', '==', organizationId);
+
+    // memberは自分のスキャンのみ閲覧可能
+    if (userRole === 'member') {
+      query = query.where('userId', '==', userId);
+    }
+
+    // カウント取得
+    const countSnapshot = await query.count().get();
+    const total = countSnapshot.data().count;
+
+    // ページネーション付きで取得
+    const snapshot = await query
+      .orderBy('createdAt', 'desc')
+      .limit(limit + offset)
+      .get();
+
+    const allScans = snapshot.docs.map((doc) => convertScanTimestamps(doc.data() as Scan));
+    const scans = allScans.slice(offset, offset + limit);
+
+    return { scans, total };
+  },
+
+  /**
+   * スキャンへのアクセス権限をチェック
+   */
+  canAccessScan(scan: Scan, userId: string, userRole: 'owner' | 'admin' | 'member'): boolean {
+    // admin/ownerは全スキャンにアクセス可能
+    if (userRole === 'admin' || userRole === 'owner') {
+      return true;
+    }
+    // memberは自分のスキャンのみ
+    return scan.userId === userId;
+  },
+
+  /**
+   * スキャンの編集権限をチェック
+   */
+  canEditScan(scan: Scan, userId: string, userRole: 'owner' | 'admin' | 'member'): boolean {
+    // ownerは全スキャンを編集可能
+    if (userRole === 'owner') {
+      return true;
+    }
+    // admin/memberは自分のスキャンのみ編集可能
+    return scan.userId === userId;
+  },
+
+  /**
+   * 組織の全スキャンを取得（後方互換性のため残す、管理者専用）
+   */
   async getByOrganization(organizationId: string, limit = 10, offset = 0): Promise<{ scans: Scan[]; total: number }> {
     // Get total count
     const countSnapshot = await scansRef
@@ -226,6 +291,62 @@ export const ScanService = {
     const scans = allScans.slice(offset, offset + limit);
 
     return { scans, total };
+  },
+
+  /**
+   * 特定ユーザーのスキャン一覧を取得（管理者用）
+   */
+  async getByUser(
+    organizationId: string,
+    targetUserId: string,
+    limit = 10,
+    offset = 0
+  ): Promise<{ scans: Scan[]; total: number }> {
+    const query = scansRef
+      .where('organizationId', '==', organizationId)
+      .where('userId', '==', targetUserId);
+
+    const countSnapshot = await query.count().get();
+    const total = countSnapshot.data().count;
+
+    const snapshot = await query
+      .orderBy('createdAt', 'desc')
+      .limit(limit + offset)
+      .get();
+
+    const allScans = snapshot.docs.map((doc) => convertScanTimestamps(doc.data() as Scan));
+    const scans = allScans.slice(offset, offset + limit);
+
+    return { scans, total };
+  },
+
+  /**
+   * 組織内のユーザーごとのスキャンサマリーを取得（管理者ダッシュボード用）
+   */
+  async getUserScanSummaries(organizationId: string): Promise<UserScanSummary[]> {
+    // 全ユーザーを取得
+    const users = await UserService.getByOrganization(organizationId);
+
+    // 各ユーザーの最新スキャンを取得
+    const summaries: UserScanSummary[] = [];
+
+    for (const user of users) {
+      const { scans } = await this.getByUser(organizationId, user.id, 1);
+      const latestScan = scans[0] || null;
+
+      summaries.push({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.displayName,
+        userRole: user.role,
+        lastScanAt: latestScan?.completedAt || null,
+        lastScanStatus: latestScan?.status || null,
+        riskySummary: latestScan?.riskySummary || null,
+        totalFiles: latestScan?.totalFiles || 0,
+      });
+    }
+
+    return summaries;
   },
 
   async update(id: string, data: Partial<Scan>): Promise<void> {
@@ -259,6 +380,25 @@ export const ScanService = {
     });
   },
 };
+
+/**
+ * ユーザーのスキャンサマリー（管理者ダッシュボード用）
+ */
+export interface UserScanSummary {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userRole: 'owner' | 'admin' | 'member';
+  lastScanAt: Date | string | null;
+  lastScanStatus: 'running' | 'completed' | 'failed' | null;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  } | null;
+  totalFiles: number;
+}
 
 /**
  * スキャンファイル関連の操作
@@ -595,5 +735,248 @@ export interface FolderSummary {
   highestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
   totalRiskScore: number;
 }
+
+/**
+ * アクションログ関連の操作
+ */
+export const ActionLogService = {
+  /**
+   * アクションログを作成
+   */
+  async create(data: Omit<ActionLog, 'id' | 'createdAt'>): Promise<ActionLog> {
+    const docRef = actionLogsRef.doc();
+    const log: ActionLog = {
+      ...data,
+      id: docRef.id,
+      createdAt: new Date(),
+    };
+    await docRef.set(log);
+    return log;
+  },
+
+  /**
+   * 組織のアクションログを取得
+   */
+  async getByOrganization(
+    organizationId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      actionType?: ActionLog['actionType'];
+      startDate?: Date;
+      endDate?: Date;
+    } = {}
+  ): Promise<{ logs: ActionLog[]; total: number }> {
+    const { limit = 20, offset = 0, actionType, startDate, endDate } = options;
+
+    let query: FirebaseFirestore.Query = actionLogsRef
+      .where('organizationId', '==', organizationId);
+
+    if (actionType) {
+      query = query.where('actionType', '==', actionType);
+    }
+
+    if (startDate) {
+      query = query.where('createdAt', '>=', startDate);
+    }
+
+    if (endDate) {
+      query = query.where('createdAt', '<=', endDate);
+    }
+
+    // カウント取得
+    const countSnapshot = await query.count().get();
+    const total = countSnapshot.data().count;
+
+    // データ取得（日時順）
+    query = query.orderBy('createdAt', 'desc').offset(offset).limit(limit);
+    const snapshot = await query.get();
+
+    const logs = snapshot.docs.map((doc) => {
+      const data = doc.data() as ActionLog;
+      return {
+        ...data,
+        createdAt: toISOString(data.createdAt) as unknown as Date,
+      };
+    });
+
+    return { logs, total };
+  },
+
+  /**
+   * 権限変更ログを記録
+   */
+  async logPermissionChange(params: {
+    organizationId: string;
+    userId: string;
+    userEmail: string;
+    actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete';
+    targetType: 'file' | 'folder';
+    targetId: string;
+    targetName: string;
+    details: ActionLog['details'];
+    success: boolean;
+    errorMessage?: string;
+  }): Promise<ActionLog> {
+    return this.create(params);
+  },
+};
+
+/**
+ * 通知設定関連の操作
+ */
+export const NotificationSettingsService = {
+  /**
+   * 組織の通知設定を取得（存在しない場合はデフォルト設定を作成）
+   */
+  async getByOrganization(organizationId: string): Promise<NotificationSettings> {
+    const docRef = notificationSettingsRef.doc(organizationId);
+    const doc = await docRef.get();
+
+    if (doc.exists) {
+      const data = doc.data() as NotificationSettings;
+      return {
+        ...data,
+        createdAt: toISOString(data.createdAt) as unknown as Date,
+        updatedAt: toISOString(data.updatedAt) as unknown as Date,
+      };
+    }
+
+    // デフォルト設定を作成
+    const now = new Date();
+    const defaultSettings: NotificationSettings = {
+      id: organizationId,
+      organizationId,
+      emailNotifications: {
+        enabled: false,
+        recipients: [],
+        triggers: {
+          scanCompleted: true,
+          criticalRiskDetected: true,
+          highRiskDetected: false,
+          weeklyReport: false,
+        },
+        thresholds: {
+          minRiskScore: 80,
+          minCriticalCount: 1,
+        },
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await docRef.set(defaultSettings);
+    return defaultSettings;
+  },
+
+  /**
+   * 通知設定を更新
+   */
+  async update(
+    organizationId: string,
+    updates: Partial<{
+      emailNotifications: NotificationSettings['emailNotifications'];
+      slackNotifications: NotificationSettings['slackNotifications'];
+    }>
+  ): Promise<NotificationSettings> {
+    const docRef = notificationSettingsRef.doc(organizationId);
+    const now = new Date();
+
+    await docRef.update({
+      ...updates,
+      updatedAt: now,
+    });
+
+    return this.getByOrganization(organizationId);
+  },
+
+  /**
+   * メール受信者を追加
+   */
+  async addRecipient(organizationId: string, email: string): Promise<void> {
+    const settings = await this.getByOrganization(organizationId);
+    if (!settings.emailNotifications.recipients.includes(email)) {
+      const recipients = [...settings.emailNotifications.recipients, email];
+      await this.update(organizationId, {
+        emailNotifications: {
+          ...settings.emailNotifications,
+          recipients,
+        },
+      });
+    }
+  },
+
+  /**
+   * メール受信者を削除
+   */
+  async removeRecipient(organizationId: string, email: string): Promise<void> {
+    const settings = await this.getByOrganization(organizationId);
+    const recipients = settings.emailNotifications.recipients.filter(r => r !== email);
+    await this.update(organizationId, {
+      emailNotifications: {
+        ...settings.emailNotifications,
+        recipients,
+      },
+    });
+  },
+};
+
+/**
+ * 通知ログ関連の操作
+ */
+export const NotificationLogService = {
+  /**
+   * 通知ログを作成
+   */
+  async create(data: Omit<NotificationLog, 'id' | 'createdAt'>): Promise<NotificationLog> {
+    const docRef = notificationLogsRef.doc();
+    const log: NotificationLog = {
+      ...data,
+      id: docRef.id,
+      createdAt: new Date(),
+    };
+    await docRef.set(log);
+    return log;
+  },
+
+  /**
+   * 組織の通知ログを取得
+   */
+  async getByOrganization(
+    organizationId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      type?: NotificationLog['type'];
+    } = {}
+  ): Promise<{ logs: NotificationLog[]; total: number }> {
+    const { limit = 20, offset = 0, type } = options;
+
+    let query: FirebaseFirestore.Query = notificationLogsRef
+      .where('organizationId', '==', organizationId);
+
+    if (type) {
+      query = query.where('type', '==', type);
+    }
+
+    // カウント取得
+    const countSnapshot = await query.count().get();
+    const total = countSnapshot.data().count;
+
+    // データ取得
+    query = query.orderBy('createdAt', 'desc').offset(offset).limit(limit);
+    const snapshot = await query.get();
+
+    const logs = snapshot.docs.map((doc) => {
+      const data = doc.data() as NotificationLog;
+      return {
+        ...data,
+        createdAt: toISOString(data.createdAt) as unknown as Date,
+      };
+    });
+
+    return { logs, total };
+  },
+};
 
 export { firestore };

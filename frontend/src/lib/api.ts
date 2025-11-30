@@ -134,6 +134,85 @@ export const scanApi = {
     if (options?.sortOrder) params.sortOrder = options.sortOrder;
     return api.get<{ files: ScannedFile[]; pagination: Pagination }>(`/api/scan/${scanId}/folders/${folderId}/files`, { params });
   },
+  // Permission management
+  deletePermission: (scanId: string, fileId: string, permissionId: string) =>
+    api.delete<{ success: boolean; message: string; fileId: string; permissionId: string }>(
+      `/api/scan/${scanId}/files/${fileId}/permissions/${permissionId}`
+    ),
+  updatePermissionRole: (scanId: string, fileId: string, permissionId: string, role: 'reader' | 'commenter' | 'writer') =>
+    api.put<{ success: boolean; message: string; fileId: string; permissionId: string; permission: ScannedFile['permissions'][0] }>(
+      `/api/scan/${scanId}/files/${fileId}/permissions/${permissionId}`,
+      { role }
+    ),
+  getFilePermissions: (scanId: string, fileId: string) =>
+    api.get<{ fileId: string; permissions: ScannedFile['permissions'] }>(
+      `/api/scan/${scanId}/files/${fileId}/permissions`
+    ),
+  getFolderPath: (scanId: string, fileId: string) =>
+    api.get<{ fileId: string; folderPath: FolderPathItem[] }>(
+      `/api/scan/${scanId}/files/${fileId}/folder-path`
+    ),
+  // 管理者用API
+  admin: {
+    getUsers: () =>
+      api.get<{
+        users: UserScanSummary[];
+        stats: {
+          totalUsers: number;
+          usersWithScans: number;
+          usersWithoutScans: number;
+          totalRisks: {
+            critical: number;
+            high: number;
+            medium: number;
+            low: number;
+          };
+        };
+      }>('/api/scan/admin/users'),
+    getUserScans: (userId: string, limit = 10, offset = 0) =>
+      api.get<{
+        user: {
+          id: string;
+          email: string;
+          displayName: string;
+          role: 'owner' | 'admin' | 'member';
+        };
+        scans: Scan[];
+        pagination: Pagination;
+      }>(`/api/scan/admin/users/${userId}/scans`, {
+        params: { limit: String(limit), offset: String(offset) },
+      }),
+    getAll: (limit = 20, offset = 0) =>
+      api.get<{ scans: Scan[]; pagination: Pagination }>('/api/scan/admin/all', {
+        params: { limit: String(limit), offset: String(offset) },
+      }),
+  },
+  // 一括操作API
+  bulk: {
+    deletePermissions: (
+      scanId: string,
+      fileIds: string[],
+      permissionFilter: BulkPermissionFilter
+    ) =>
+      api.post<BulkOperationResult>(
+        `/api/scan/${scanId}/bulk/permissions/delete`,
+        { fileIds, permissionFilter }
+      ),
+    demoteToReader: (
+      scanId: string,
+      fileIds: string[],
+      permissionFilter?: { type?: 'user' | 'group' | 'domain' | 'anyone'; email?: string }
+    ) =>
+      api.post<BulkOperationResult>(
+        `/api/scan/${scanId}/bulk/permissions/demote`,
+        { fileIds, permissionFilter }
+      ),
+    removePublicAccess: (scanId: string, fileIds: string[]) =>
+      api.post<BulkOperationResult>(
+        `/api/scan/${scanId}/bulk/remove-public-access`,
+        { fileIds }
+      ),
+  },
 };
 
 // Types
@@ -167,6 +246,9 @@ export interface Scan {
   id: string;
   organizationId: string;
   userId: string;
+  userEmail: string;
+  userName: string;
+  visibility: 'private' | 'organization';
   status: 'running' | 'completed' | 'failed';
   phase: 'counting' | 'scanning' | 'done';
   totalFiles: number;
@@ -219,6 +301,12 @@ export interface Pagination {
   limit: number;
   offset: number;
   hasMore: boolean;
+}
+
+export interface FolderPathItem {
+  id: string;
+  name: string;
+  permissions: ScannedFile['permissions'];
 }
 
 export interface FolderSummary {
@@ -334,6 +422,24 @@ export const auditLogsApi = {
       '/api/audit-logs/suspicious-logins',
       options ? { params: options as Record<string, string> } : undefined
     ),
+  getActionLogs: (options?: {
+    limit?: number;
+    offset?: number;
+    actionType?: ActionLog['actionType'];
+    startTime?: string;
+    endTime?: string;
+  }) => {
+    const params: Record<string, string> = {};
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.offset) params.offset = String(options.offset);
+    if (options?.actionType) params.actionType = options.actionType;
+    if (options?.startTime) params.startTime = options.startTime;
+    if (options?.endTime) params.endTime = options.endTime;
+    return api.get<{ logs: ActionLog[]; pagination: Pagination }>(
+      '/api/audit-logs/actions',
+      Object.keys(params).length > 0 ? { params } : undefined
+    );
+  },
 };
 
 export interface AuditLogQueryOptions {
@@ -380,4 +486,352 @@ export interface LoginAuditLog extends AuditLog {
   loginType: string | null;
   isSecondFactor: boolean;
   isSuspicious: boolean;
+}
+
+// アプリ内アクションログ
+export interface ActionLog {
+  id: string;
+  organizationId: string;
+  userId: string;
+  userEmail: string;
+  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete';
+  targetType: 'file' | 'folder';
+  targetId: string;
+  targetName: string;
+  details: {
+    permissionId?: string;
+    targetEmail?: string;
+    targetType?: 'user' | 'group' | 'domain' | 'anyone';
+    oldRole?: string;
+    newRole?: string;
+    affectedCount?: number;
+  };
+  success: boolean;
+  errorMessage?: string;
+  createdAt: string;
+}
+
+// 管理者ダッシュボード用
+export interface UserScanSummary {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userRole: 'owner' | 'admin' | 'member';
+  lastScanAt: string | null;
+  lastScanStatus: 'running' | 'completed' | 'failed' | null;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  } | null;
+  totalFiles: number;
+}
+
+// Reports API (ISMS/Pマーク対応)
+export const reportsApi = {
+  // スキャン実施履歴レポート
+  getScanHistory: (options?: { startDate?: string; endDate?: string }) => {
+    const params: Record<string, string> = {};
+    if (options?.startDate) params.startDate = options.startDate;
+    if (options?.endDate) params.endDate = options.endDate;
+    return api.get<{ report: ScanHistoryReport }>(
+      '/api/reports/scan-history',
+      Object.keys(params).length > 0 ? { params } : undefined
+    );
+  },
+  // リスクアセスメントレポート
+  getRiskAssessment: (scanId: string) =>
+    api.get<{ report: RiskAssessmentReport }>(`/api/reports/risk-assessment/${scanId}`),
+  // 是正対応履歴レポート
+  getRemediationHistory: (options?: { startDate?: string; endDate?: string }) => {
+    const params: Record<string, string> = {};
+    if (options?.startDate) params.startDate = options.startDate;
+    if (options?.endDate) params.endDate = options.endDate;
+    return api.get<{ report: RemediationHistoryReport }>(
+      '/api/reports/remediation-history',
+      Object.keys(params).length > 0 ? { params } : undefined
+    );
+  },
+  // 外部共有一覧レポート
+  getExternalSharing: (scanId: string) =>
+    api.get<{ report: ExternalSharingReport }>(`/api/reports/external-sharing/${scanId}`),
+  // 現在のリスク状況レポート
+  getCurrentRisks: () =>
+    api.get<{ report: CurrentRisksReport }>('/api/reports/current-risks'),
+};
+
+// レポート型定義
+export interface ScanHistoryReport {
+  reportType: 'scan_history';
+  generatedAt: string;
+  organization: {
+    name: string;
+    domain: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  summary: {
+    totalScans: number;
+    completedScans: number;
+    failedScans: number;
+    totalFilesScanned: number;
+    uniqueUsers: number;
+  };
+  scans: {
+    id: string;
+    userName: string;
+    userEmail: string;
+    startedAt: string;
+    completedAt: string | null;
+    status: string;
+    totalFiles: number;
+    riskySummary: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+  }[];
+}
+
+export interface RiskAssessmentReport {
+  reportType: 'risk_assessment';
+  generatedAt: string;
+  organization: {
+    name: string;
+    domain: string;
+  };
+  scanInfo: {
+    scanId: string;
+    scannedAt: string;
+    scannedBy: string;
+  };
+  summary: {
+    totalFiles: number;
+    riskySummary: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+    externalShareCount: number;
+    publicShareCount: number;
+  };
+  criticalFiles: ReportFile[];
+  highFiles: ReportFile[];
+}
+
+export interface ReportFile {
+  id: string;
+  name: string;
+  ownerEmail: string;
+  riskScore: number;
+  riskLevel: string;
+  riskFactors: string[];
+  recommendations: string[];
+  webViewLink: string | null;
+}
+
+export interface RemediationHistoryReport {
+  reportType: 'remediation_history';
+  generatedAt: string;
+  organization: {
+    name: string;
+    domain: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  summary: {
+    totalActions: number;
+    successfulActions: number;
+    failedActions: number;
+    permissionsDeleted: number;
+    permissionsUpdated: number;
+  };
+  actions: {
+    id: string;
+    userEmail: string;
+    actionType: string;
+    targetName: string;
+    targetType: string;
+    details: {
+      targetEmail?: string;
+      oldRole?: string;
+      newRole?: string;
+    };
+    success: boolean;
+    createdAt: string;
+  }[];
+}
+
+export interface ExternalSharingReport {
+  reportType: 'external_sharing';
+  generatedAt: string;
+  organization: {
+    name: string;
+    domain: string;
+  };
+  scanInfo: {
+    scanId: string;
+    scannedAt: string;
+  };
+  summary: {
+    totalExternalShares: number;
+    publicShares: number;
+    externalUserShares: number;
+    externalDomainShares: number;
+  };
+  files: {
+    id: string;
+    name: string;
+    ownerEmail: string;
+    riskLevel: string;
+    externalPermissions: {
+      type: string;
+      email: string | null;
+      domain: string | null;
+      role: string;
+    }[];
+    webViewLink: string | null;
+  }[];
+}
+
+export interface CurrentRisksReport {
+  reportType: 'current_risks';
+  generatedAt: string;
+  organization: {
+    name: string;
+    domain: string;
+  };
+  summary: {
+    totalUsers: number;
+    usersWithScans: number;
+    usersWithoutScans: number;
+    totalFiles: number;
+    riskySummary: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+    remediationRate: number;
+  };
+  userBreakdown: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    lastScanAt: string;
+    totalFiles: number;
+    riskySummary: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+  }[];
+}
+
+// 一括操作用の型定義
+export interface BulkPermissionFilter {
+  type?: 'user' | 'group' | 'domain' | 'anyone';
+  email?: string;
+  role?: string;
+}
+
+export interface BulkOperationResult {
+  success: boolean;
+  message: string;
+  results: {
+    total: number;
+    success: number;
+    failed: number;
+    details: {
+      fileId: string;
+      fileName: string;
+      success: boolean;
+      permissionId?: string;
+      oldRole?: string;
+      error?: string;
+    }[];
+  };
+}
+
+// Notifications API
+export const notificationsApi = {
+  getSettings: () =>
+    api.get<{ settings: NotificationSettings }>('/api/notifications/settings'),
+  updateSettings: (settings: Partial<NotificationSettings>) =>
+    api.put<{ settings: NotificationSettings; message: string }>('/api/notifications/settings', settings),
+  addRecipient: (email: string) =>
+    api.post<{ settings: NotificationSettings; message: string }>('/api/notifications/settings/recipients', { email }),
+  removeRecipient: (email: string) =>
+    api.delete<{ settings: NotificationSettings; message: string }>(`/api/notifications/settings/recipients/${encodeURIComponent(email)}`),
+  getLogs: (options?: { limit?: number; offset?: number; type?: NotificationLog['type'] }) => {
+    const params: Record<string, string> = {};
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.offset) params.offset = String(options.offset);
+    if (options?.type) params.type = options.type;
+    return api.get<{ logs: NotificationLog[]; pagination: Pagination }>(
+      '/api/notifications/logs',
+      Object.keys(params).length > 0 ? { params } : undefined
+    );
+  },
+  sendTestNotification: () =>
+    api.post<{ success: boolean; message: string; recipients: string[] }>('/api/notifications/test'),
+};
+
+// 通知設定型定義
+export interface NotificationSettings {
+  id: string;
+  organizationId: string;
+  emailNotifications: {
+    enabled: boolean;
+    recipients: string[];
+    triggers: {
+      scanCompleted: boolean;
+      criticalRiskDetected: boolean;
+      highRiskDetected: boolean;
+      weeklyReport: boolean;
+    };
+    thresholds: {
+      minRiskScore: number;
+      minCriticalCount: number;
+    };
+  };
+  slackNotifications?: {
+    enabled: boolean;
+    webhookUrl: string | null;
+    channel: string | null;
+    triggers: {
+      scanCompleted: boolean;
+      criticalRiskDetected: boolean;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationLog {
+  id: string;
+  organizationId: string;
+  type: 'scan_completed' | 'critical_risk' | 'high_risk' | 'weekly_report';
+  channel: 'email' | 'slack';
+  recipients: string[];
+  subject: string;
+  summary: string;
+  scanId?: string;
+  riskySummary?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  success: boolean;
+  errorMessage?: string;
+  createdAt: string;
 }

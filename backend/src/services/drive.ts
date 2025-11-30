@@ -512,3 +512,70 @@ export async function getFilePermissions(
     return [];
   }
 }
+
+/**
+ * フォルダ情報の型
+ */
+export interface FolderInfo {
+  id: string;
+  name: string;
+  permissions: DrivePermission[];
+}
+
+/**
+ * フォルダ階層（パス）を取得
+ * 指定されたフォルダIDから親を辿り、ルートまでの階層を返す
+ * @param folderId - 開始フォルダのID（ファイルの親フォルダID）
+ */
+export async function getFileFolderPath(
+  drive: drive_v3.Drive,
+  folderId: string
+): Promise<FolderInfo[]> {
+  const path: FolderInfo[] = [];
+  const visited = new Set<string>(); // 無限ループ防止
+  let currentId: string | null = folderId;
+
+  // フォルダを辿る（最大10階層まで）
+  while (currentId && path.length < 10) {
+    // 無限ループ防止
+    if (visited.has(currentId)) break;
+    visited.add(currentId);
+
+    try {
+      const folderResponse: { data: drive_v3.Schema$File } = await drive.files.get({
+        fileId: currentId,
+        fields: 'id,name,parents,permissions(id,type,role,emailAddress,domain,displayName)',
+      });
+
+      const folder: drive_v3.Schema$File = folderResponse.data;
+
+      // 現在のフォルダを追加
+      path.unshift({
+        id: currentId,
+        name: folder.name || '',
+        permissions: (folder.permissions || []).map((perm: drive_v3.Schema$Permission) => ({
+          id: perm.id || '',
+          type: perm.type as DrivePermission['type'],
+          role: perm.role as DrivePermission['role'],
+          emailAddress: perm.emailAddress || null,
+          domain: perm.domain || null,
+          displayName: perm.displayName || null,
+        })),
+      });
+
+      // マイドライブのルートに到達した場合は終了
+      if (!folder.parents || folder.parents.length === 0) {
+        break;
+      }
+
+      // 次の親フォルダへ
+      currentId = folder.parents[0];
+    } catch (error) {
+      // フォルダにアクセスできない場合（権限なし等）
+      console.warn(`Failed to get folder info for ${currentId}:`, error);
+      break;
+    }
+  }
+
+  return path;
+}

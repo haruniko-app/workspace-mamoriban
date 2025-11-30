@@ -51,7 +51,15 @@ export interface User {
 export interface Scan {
   id: string;
   organizationId: string;
-  userId: string;                  // 実行したユーザー
+  userId: string;                  // 実行したユーザー（所有者）
+  userEmail: string;               // 実行したユーザーのメール（表示用）
+  userName: string;                // 実行したユーザー名（表示用）
+
+  // アクセス制御
+  visibility: 'private' | 'organization';  // private: 本人のみ, organization: 組織全体
+  // アクセス権限:
+  // - private: 本人 + admin/owner が閲覧可能
+  // - organization: 組織メンバー全員が閲覧可能
 
   // スキャン結果サマリー
   status: 'running' | 'completed' | 'failed';
@@ -153,3 +161,103 @@ export const PLANS = {
 } as const;
 
 export type PlanType = keyof typeof PLANS;
+
+// アクションログ（権限変更などのユーザーアクションを記録）
+export interface ActionLog {
+  id: string;
+  organizationId: string;
+  userId: string;                  // 実行したユーザー
+  userEmail: string;               // 実行したユーザーのメール
+
+  // アクション情報
+  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete';
+  targetType: 'file' | 'folder';
+  targetId: string;                // ファイルまたはフォルダID
+  targetName: string;              // ファイルまたはフォルダ名
+
+  // 変更詳細
+  details: {
+    permissionId?: string;
+    targetEmail?: string;          // 対象ユーザーのメール
+    targetType?: 'user' | 'group' | 'domain' | 'anyone';
+    oldRole?: string;
+    newRole?: string;
+    affectedCount?: number;        // 一括操作の場合の件数
+  };
+
+  // 結果
+  success: boolean;
+  errorMessage?: string;
+
+  createdAt: Date;
+}
+
+// 通知設定（組織単位）
+export interface NotificationSettings {
+  id: string;                      // organizationIdと同じ
+  organizationId: string;
+
+  // メール通知設定
+  emailNotifications: {
+    enabled: boolean;
+    recipients: string[];          // 通知を受け取るメールアドレス一覧
+
+    // 通知トリガー
+    triggers: {
+      scanCompleted: boolean;      // スキャン完了時
+      criticalRiskDetected: boolean;  // Criticalリスク検出時
+      highRiskDetected: boolean;   // Highリスク検出時
+      weeklyReport: boolean;       // 週次サマリーレポート
+    };
+
+    // 閾値設定
+    thresholds: {
+      minRiskScore: number;        // この点数以上のファイルを通知 (0-100)
+      minCriticalCount: number;    // Critical件数がこれ以上で即時通知
+    };
+  };
+
+  // Slack通知（将来拡張用）
+  slackNotifications?: {
+    enabled: boolean;
+    webhookUrl: string | null;
+    channel: string | null;
+    triggers: {
+      scanCompleted: boolean;
+      criticalRiskDetected: boolean;
+    };
+  };
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// 通知履歴
+export interface NotificationLog {
+  id: string;
+  organizationId: string;
+
+  // 通知タイプ
+  type: 'scan_completed' | 'critical_risk' | 'high_risk' | 'weekly_report';
+  channel: 'email' | 'slack';
+
+  // 通知内容
+  recipients: string[];
+  subject: string;
+  summary: string;
+
+  // 関連情報
+  scanId?: string;
+  riskySummary?: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+
+  // 結果
+  success: boolean;
+  errorMessage?: string;
+
+  createdAt: Date;
+}

@@ -9,7 +9,8 @@ import {
   getSuspiciousLoginLogs,
   getAuditLogSummary,
 } from '../services/reports.js';
-import { OrganizationService } from '../services/firestore.js';
+import { OrganizationService, ActionLogService } from '../services/firestore.js';
+import type { ActionLog } from '../types/models.js';
 
 const router = Router();
 
@@ -258,6 +259,46 @@ router.get('/suspicious-logins', requireAuth, requireAdmin, async (req: Request,
     }
 
     res.status(500).json({ error: '不審なログインログの取得に失敗しました' });
+  }
+});
+
+/**
+ * GET /api/audit-logs/actions
+ * アプリ内アクションログ（権限変更など）を取得
+ */
+router.get('/actions', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const organization = req.organization!;
+    const { limit, offset, actionType, startTime, endTime } = req.query;
+
+    const options: {
+      limit?: number;
+      offset?: number;
+      actionType?: ActionLog['actionType'];
+      startDate?: Date;
+      endDate?: Date;
+    } = {};
+
+    if (limit) options.limit = parseInt(limit as string);
+    if (offset) options.offset = parseInt(offset as string);
+    if (actionType) options.actionType = actionType as ActionLog['actionType'];
+    if (startTime) options.startDate = new Date(startTime as string);
+    if (endTime) options.endDate = new Date(endTime as string);
+
+    const { logs, total } = await ActionLogService.getByOrganization(organization.id, options);
+
+    res.json({
+      logs,
+      pagination: {
+        total,
+        limit: options.limit || 20,
+        offset: options.offset || 0,
+        hasMore: (options.offset || 0) + logs.length < total,
+      },
+    });
+  } catch (error: unknown) {
+    console.error('Error getting action logs:', error);
+    res.status(500).json({ error: 'アクションログの取得に失敗しました' });
   }
 });
 
