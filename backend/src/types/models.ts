@@ -84,7 +84,7 @@ export interface Scan {
 
   // スキャン結果サマリー
   status: 'running' | 'completed' | 'failed';
-  phase: 'counting' | 'scanning' | 'done';  // スキャンフェーズ
+  phase: 'counting' | 'scanning' | 'resolving' | 'saving' | 'done';  // スキャンフェーズ
   totalFiles: number;              // 総ファイル数（カウント完了後に確定）
   processedFiles: number;          // 処理済みファイル数
   riskySummary: {
@@ -191,7 +191,7 @@ export interface ActionLog {
   userEmail: string;               // 実行したユーザーのメール
 
   // アクション情報
-  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete';
+  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update';
   targetType: 'file' | 'folder';
   targetId: string;                // ファイルまたはフォルダID
   targetName: string;              // ファイルまたはフォルダ名
@@ -204,6 +204,14 @@ export interface ActionLog {
     oldRole?: string;
     newRole?: string;
     affectedCount?: number;        // 一括操作の場合の件数
+    fileIds?: string[];            // 一括操作対象のファイルID一覧
+    filter?: {                     // 一括操作のフィルター条件
+      type?: 'user' | 'group' | 'domain' | 'anyone';
+      email?: string;
+    };
+    action?: string;               // 一括操作のアクション種別
+    successCount?: number;         // 成功件数
+    failedCount?: number;          // 失敗件数
   };
 
   // 結果

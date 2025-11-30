@@ -504,6 +504,10 @@ export const ScannedFileService = {
 
   /**
    * スキャンの全ファイルを取得（ページネーション）
+   *
+   * パフォーマンス最適化:
+   * - 検索なし: Firestoreクエリで直接ページネーション（高速）
+   * - 検索あり: メモリフィルタリング（大量ファイルでは遅い）
    */
   async getAll(
     scanId: string,
@@ -514,71 +518,99 @@ export const ScannedFileService = {
       ownerType?: 'all' | 'internal' | 'external';
       sortBy?: 'riskScore' | 'name' | 'modifiedTime';
       sortOrder?: 'asc' | 'desc';
+      search?: string;
     } = {}
   ): Promise<{ files: ScannedFile[]; total: number }> {
-    const { limit = 20, offset = 0, riskLevel, ownerType = 'all', sortBy = 'riskScore', sortOrder = 'desc' } = options;
+    const { limit = 20, offset = 0, riskLevel, ownerType = 'all', sortBy = 'riskScore', sortOrder = 'desc', search } = options;
     const filesRef = scansRef.doc(scanId).collection('files');
 
-    // フィルター有無を判定
+    // 検索有無を判定
+    const hasSearch = !!search;
     const hasFilter = riskLevel || (ownerType && ownerType !== 'all');
 
-    // カウント用クエリ
-    let countQuery: FirebaseFirestore.Query = filesRef;
+    // 基本クエリの構築
+    let baseQuery: FirebaseFirestore.Query = filesRef;
     if (riskLevel) {
-      countQuery = countQuery.where('riskLevel', '==', riskLevel);
+      baseQuery = baseQuery.where('riskLevel', '==', riskLevel);
     }
     if (ownerType === 'internal') {
-      countQuery = countQuery.where('isInternalOwner', '==', true);
+      baseQuery = baseQuery.where('isInternalOwner', '==', true);
     } else if (ownerType === 'external') {
-      countQuery = countQuery.where('isInternalOwner', '==', false);
-    }
-    const countSnapshot = await countQuery.count().get();
-    const total = countSnapshot.data().count;
-
-    // 0件の場合は早期リターン
-    if (total === 0) {
-      return { files: [], total: 0 };
+      baseQuery = baseQuery.where('isInternalOwner', '==', false);
     }
 
-    // データ取得用クエリ
-    // Note: Firestoreで where + orderBy を使う場合、複合インデックスが必要
-    // フィルター時はソートなしで取得し、メモリ上でソート
-    let dataQuery: FirebaseFirestore.Query = filesRef;
-    if (riskLevel) {
-      dataQuery = dataQuery.where('riskLevel', '==', riskLevel);
-    }
-    if (ownerType === 'internal') {
-      dataQuery = dataQuery.where('isInternalOwner', '==', true);
-    } else if (ownerType === 'external') {
-      dataQuery = dataQuery.where('isInternalOwner', '==', false);
-    }
+    // 検索がない場合: Firestoreクエリで直接ページネーション（高速）
+    if (!hasSearch) {
+      // カウント取得
+      const countSnapshot = await baseQuery.count().get();
+      const total = countSnapshot.data().count;
 
-    // フィルター時はページネーションを手動で行う
-    if (hasFilter) {
-      // 全件取得してメモリ上でソート・ページネーション
-      const allDocs = await dataQuery.get();
-      let allFiles = allDocs.docs.map((doc) => doc.data() as ScannedFile);
+      if (total === 0) {
+        return { files: [], total: 0 };
+      }
 
-      // ソート
-      allFiles.sort((a, b) => {
-        const aVal = a[sortBy as keyof ScannedFile] as string | number;
-        const bVal = b[sortBy as keyof ScannedFile] as string | number;
-        if (sortOrder === 'desc') {
-          return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+      // Firestoreクエリでソート＋ページネーション
+      // Note: フィルター + orderBy には複合インデックスが必要
+      // インデックスがない場合は自動的にエラーになり、作成URLがログに出る
+      try {
+        const dataQuery = baseQuery.orderBy(sortBy, sortOrder).offset(offset).limit(limit);
+        const snapshot = await dataQuery.get();
+        const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+        return { files, total };
+      } catch (error) {
+        // インデックスエラーの場合はフォールバック
+        // ただし、大量データでは遅くなる可能性があるため警告ログ
+        console.warn('Firestore composite index may be missing, falling back to memory sort:', error);
+
+        // メモリソート（フィルターありの場合のみ、インデックスがない場合の救済）
+        if (hasFilter) {
+          const allDocs = await baseQuery.get();
+          let allFiles = allDocs.docs.map((doc) => doc.data() as ScannedFile);
+
+          // ソート
+          allFiles.sort((a, b) => {
+            const aVal = a[sortBy as keyof ScannedFile] as string | number;
+            const bVal = b[sortBy as keyof ScannedFile] as string | number;
+            if (sortOrder === 'desc') {
+              return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+            }
+            return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+          });
+
+          const files = allFiles.slice(offset, offset + limit);
+          return { files, total };
         }
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      });
-
-      // ページネーション
-      const files = allFiles.slice(offset, offset + limit);
-      return { files, total };
+        throw error;
+      }
     }
 
-    dataQuery = dataQuery.orderBy(sortBy, sortOrder).offset(offset).limit(limit);
-    const snapshot = await dataQuery.get();
-    const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+    // 検索がある場合: メモリフィルタリング（部分一致検索のため）
+    // Firestoreは部分一致検索をネイティブサポートしていない
+    const allDocs = await baseQuery.get();
+    let allFiles = allDocs.docs.map((doc) => doc.data() as ScannedFile);
 
-    return { files, total };
+    // 検索フィルター（ファイル名で部分一致検索）
+    const searchLower = search.toLowerCase();
+    allFiles = allFiles.filter((file) =>
+      file.name.toLowerCase().includes(searchLower)
+    );
+
+    // ソート
+    allFiles.sort((a, b) => {
+      const aVal = a[sortBy as keyof ScannedFile] as string | number;
+      const bVal = b[sortBy as keyof ScannedFile] as string | number;
+      if (sortOrder === 'desc') {
+        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+      }
+      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    });
+
+    // 検索後の件数
+    const filteredTotal = allFiles.length;
+
+    // ページネーション
+    const files = allFiles.slice(offset, offset + limit);
+    return { files, total: filteredTotal };
   },
 
   /**
@@ -721,18 +753,25 @@ export const ScannedFileService = {
 
     // フォルダIDでフィルタ
     const isRoot = folderId === 'root';
-    let query: FirebaseFirestore.Query = filesRef;
+
+    // Firestoreクエリ（rootの場合は全件取得してフィルタ、そうでない場合は直接クエリ）
+    // Note: Firestoreはnullと未定義を区別するため、rootの場合は全件取得後にフィルタ
+    let files: ScannedFile[];
+    let total: number;
 
     if (isRoot) {
-      query = query.where('parentFolderId', '==', null);
+      // rootの場合: parentFolderIdがnull、undefined、または存在しないファイルを取得
+      const snapshot = await filesRef.get();
+      files = snapshot.docs
+        .map((doc) => doc.data() as ScannedFile)
+        .filter((file) => !file.parentFolderId);
+      total = files.length;
     } else {
-      query = query.where('parentFolderId', '==', folderId);
+      const query = filesRef.where('parentFolderId', '==', folderId);
+      const snapshot = await query.get();
+      files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+      total = files.length;
     }
-
-    // 全件取得してメモリ上でソート・ページネーション
-    const snapshot = await query.get();
-    let files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
-    const total = files.length;
 
     // ソート
     files.sort((a, b) => {
@@ -863,7 +902,7 @@ export const ActionLogService = {
     organizationId: string;
     userId: string;
     userEmail: string;
-    actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete';
+    actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update';
     targetType: 'file' | 'folder';
     targetId: string;
     targetName: string;

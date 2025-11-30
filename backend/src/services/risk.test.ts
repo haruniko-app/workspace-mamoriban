@@ -105,7 +105,7 @@ describe('calculateRiskScore', () => {
   });
 
   describe('external editor', () => {
-    it('adds 15 points for external user with write access', () => {
+    it('adds 25 points for external user with write access', () => {
       const file = createMockFile({
         mimeType: 'text/plain',
         permissions: [
@@ -117,7 +117,7 @@ describe('calculateRiskScore', () => {
 
       expect(result.issues.some((i) => i.type === 'external_editor')).toBe(true);
       const editorIssue = result.issues.find((i) => i.type === 'external_editor');
-      expect(editorIssue?.points).toBe(15);
+      expect(editorIssue?.points).toBe(25);
     });
 
     it('does not add external_editor for external user with read-only access', () => {

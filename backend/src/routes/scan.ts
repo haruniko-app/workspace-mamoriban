@@ -278,6 +278,7 @@ router.get('/:scanId/files', async (req: Request, res: Response) => {
     const ownerType = req.query.ownerType as 'all' | 'internal' | 'external' | undefined;
     const sortBy = (req.query.sortBy as 'riskScore' | 'name' | 'modifiedTime') || 'riskScore';
     const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+    const search = req.query.search as string | undefined;
 
     const { files, total } = await ScannedFileService.getAll(scanId, {
       limit,
@@ -286,6 +287,7 @@ router.get('/:scanId/files', async (req: Request, res: Response) => {
       ownerType,
       sortBy,
       sortOrder,
+      search,
     });
 
     res.json({
@@ -550,14 +552,25 @@ async function performScan(
     );
 
     // ========================================
-    // 親フォルダ名を一括取得
+    // Phase 3: 親フォルダ名を一括取得
     // ========================================
-    console.log(`Scan ${scanId}: Resolving folder names...`);
+    console.log(`Scan ${scanId}: Phase 3 - Resolving folder names...`);
+    await ScanService.update(scanId, {
+      phase: 'resolving',
+    });
     const parentFolderIds = allFiles
       .map((file) => file.parents?.[0])
       .filter((id): id is string => !!id);
     const folderNameMap = await getFolderNames(drive, parentFolderIds);
     console.log(`Scan ${scanId}: Resolved ${folderNameMap.size} folder names`);
+
+    // ========================================
+    // Phase 4: Firestoreに保存
+    // ========================================
+    console.log(`Scan ${scanId}: Phase 4 - Saving to Firestore...`);
+    await ScanService.update(scanId, {
+      phase: 'saving',
+    });
 
     // ファイルをFirestoreに保存（バッチで保存）
     const BATCH_SIZE = 500; // Firestoreのバッチ上限

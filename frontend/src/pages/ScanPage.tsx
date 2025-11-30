@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { scanApi, stripeApi, type Scan } from '../lib/api';
 import { Layout } from '../components/Layout';
 
-const SCAN_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const SCAN_TIMEOUT_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -83,6 +83,12 @@ function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
               {scan.status === 'running' && !isTimedOut
                 ? scan.phase === 'counting'
                   ? 'ファイル数を把握中...'
+                  : scan.phase === 'scanning'
+                  ? 'スキャン中...'
+                  : scan.phase === 'resolving'
+                  ? 'フォルダ情報を取得中...'
+                  : scan.phase === 'saving'
+                  ? 'データを保存中...'
                   : 'スキャン中...'
                 : scan.status === 'running' && isTimedOut
                 ? 'スキャンがタイムアウトしました'
@@ -100,6 +106,12 @@ function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
             {scan.status === 'running' && !isTimedOut
               ? scan.phase === 'counting'
                 ? 'Google Drive内のファイルを数えています...'
+                : scan.phase === 'scanning'
+                ? `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+                : scan.phase === 'resolving'
+                ? 'フォルダ名を取得しています...'
+                : scan.phase === 'saving'
+                ? 'スキャン結果をデータベースに保存しています...'
                 : `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
               : scan.status === 'running' && isTimedOut
               ? 'スキャンが長時間完了しませんでした。新しいスキャンを開始してください。'
@@ -124,6 +136,32 @@ function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
               </div>
               <p className="text-xs text-[#5f6368] mt-2">
                 Google Drive内のファイルの全体数を把握しています...
+              </p>
+            </>
+          ) : scan.phase === 'resolving' ? (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[#5f6368]">フォルダ情報を取得中</span>
+                <span className="text-sm font-medium text-[#1a73e8]">仕上げ中...</span>
+              </div>
+              <div className="h-2 bg-[#e8eaed] rounded-full overflow-hidden">
+                <div className="h-full bg-[#f9ab00] rounded-full animate-pulse w-full opacity-80" />
+              </div>
+              <p className="text-xs text-[#5f6368] mt-2">
+                フォルダ名を取得してデータを整理しています...
+              </p>
+            </>
+          ) : scan.phase === 'saving' ? (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[#5f6368]">データを保存中</span>
+                <span className="text-sm font-medium text-[#34a853]">まもなく完了...</span>
+              </div>
+              <div className="h-2 bg-[#e8eaed] rounded-full overflow-hidden">
+                <div className="h-full bg-[#34a853] rounded-full animate-pulse w-full opacity-80" />
+              </div>
+              <p className="text-xs text-[#5f6368] mt-2">
+                スキャン結果をデータベースに保存しています...
               </p>
             </>
           ) : (

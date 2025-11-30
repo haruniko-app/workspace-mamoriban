@@ -195,34 +195,35 @@ function scanAllFiles() {
 ### 2. リスクスコア計算
 ```javascript
 // RiskCalculator.gs
+// ※詳細はdocs/RISK_EVALUATION_FRAMEWORK.mdを参照
 function calculateRiskScore(file) {
   let score = 0;
-  
-  // 「リンクを知っている全員」: +40点
+
+  // 「リンクを知っている全員」: +50点
   if (file.sharingAccess === 'ANYONE') {
-    score += 40;
+    score += 50;
   }
-  
+
   // 外部共有: +20点
   if (hasExternalSharing(file)) {
     score += 20;
   }
-  
-  // 外部編集権限: +15点
+
+  // 外部編集権限: +25点
   if (hasExternalEditor(file)) {
-    score += 15;
+    score += 25;
   }
-  
+
   // 機密ファイルタイプ: +15点
   if (isConfidentialType(file.mimeType)) {
     score += 15;
   }
-  
-  // 1年以上アクセスなし: +10点
+
+  // 長期未更新の共有: +10点
   if (getDaysSinceAccess(file) > 365) {
     score += 10;
   }
-  
+
   return Math.min(score, 100);
 }
 ```

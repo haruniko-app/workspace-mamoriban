@@ -100,6 +100,7 @@ export const scanApi = {
     ownerType?: 'all' | 'internal' | 'external';
     sortBy?: 'riskScore' | 'name' | 'modifiedTime';
     sortOrder?: 'asc' | 'desc';
+    search?: string;
   }) => {
     const params: Record<string, string> = {};
     if (options?.limit) params.limit = String(options.limit);
@@ -108,6 +109,7 @@ export const scanApi = {
     if (options?.ownerType) params.ownerType = options.ownerType;
     if (options?.sortBy) params.sortBy = options.sortBy;
     if (options?.sortOrder) params.sortOrder = options.sortOrder;
+    if (options?.search) params.search = options.search;
     return api.get<{ files: ScannedFile[]; pagination: Pagination }>(`/api/scan/${scanId}/files`, { params });
   },
   getFile: (scanId: string, fileId: string) => api.get<{ file: ScannedFile }>(`/api/scan/${scanId}/files/${fileId}`),
@@ -261,7 +263,7 @@ export interface Scan {
   userName: string;
   visibility: 'private' | 'organization';
   status: 'running' | 'completed' | 'failed';
-  phase: 'counting' | 'scanning' | 'done';
+  phase: 'counting' | 'scanning' | 'resolving' | 'saving' | 'done';
   totalFiles: number;
   processedFiles: number;
   riskySummary: {

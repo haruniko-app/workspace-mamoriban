@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { scanApi, type Scan } from '../lib/api';
 import { Layout } from '../components/Layout';
 import { Link, useNavigate } from 'react-router-dom';
@@ -117,10 +117,12 @@ export function DashboardPage() {
   const {
     data: historyData,
     isLoading,
+    isFetching,
     error,
   } = useQuery({
     queryKey: ['scanHistory', offset],
     queryFn: () => scanApi.getHistory(limit, offset),
+    placeholderData: keepPreviousData,
   });
 
   const latestScan = historyData?.scans.find((s) => s.status === 'completed');
@@ -155,7 +157,14 @@ export function DashboardPage() {
         </div>
 
         {/* Risk Summary Cards */}
-        {latestScan ? (
+        {isLoading && !historyData ? (
+          <div className="bg-white rounded-2xl border border-[#dadce0] p-12 flex justify-center">
+            <svg className="w-8 h-8 text-[#1a73e8] animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+        ) : latestScan ? (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <RiskCard
@@ -300,7 +309,7 @@ export function DashboardPage() {
             </Link>
           </div>
           <div className="p-2">
-            {isLoading ? (
+            {isLoading && !historyData ? (
               <div className="py-8 flex justify-center">
                 <svg className="w-8 h-8 text-[#1a73e8] animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -322,7 +331,7 @@ export function DashboardPage() {
                 <p className="text-sm text-[#5f6368]">スキャン履歴がありません</p>
               </div>
             ) : (
-              <div className="divide-y divide-[#e8eaed]">
+              <div className={`divide-y divide-[#e8eaed] transition-opacity ${isFetching ? 'opacity-60' : ''}`}>
                 {historyData?.scans.map((scan) => (
                   <ScanHistoryItem key={scan.id} scan={scan} onClick={() => handleScanClick(scan)} />
                 ))}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { scanApi, type ScannedFile, type FolderSummary, type FolderPathItem, type BulkOperationResult } from '../lib/api';
@@ -709,6 +709,16 @@ function FolderCard({
 
   const files = filesData?.files || [];
 
+  // Fetch folder path when expanded (use first file's ID)
+  const firstFileId = files[0]?.id;
+  const { data: folderPathData, isLoading: isFolderPathLoading } = useQuery({
+    queryKey: ['folderPath', scanId, firstFileId],
+    queryFn: () => scanApi.getFolderPath(scanId, firstFileId!),
+    enabled: isExpanded && !!firstFileId,
+  });
+
+  const folderPath = folderPathData?.folderPath || [];
+
   return (
     <div className={`border border-[#dadce0] rounded-xl overflow-hidden ${isExpanded ? 'ring-2 ring-[#1a73e8]' : ''}`}>
       {/* Folder Header */}
@@ -767,6 +777,38 @@ function FolderCard({
       {/* Expanded Files */}
       {isExpanded && (
         <div className="border-t border-[#dadce0] bg-[#f8f9fa]">
+          {/* Folder Path Breadcrumb */}
+          {!isLoading && files.length > 0 && (
+            <div className="px-4 py-2 border-b border-[#e8eaed] bg-white">
+              <div className="flex items-center gap-1 text-xs text-[#5f6368]">
+                <span className="font-medium">パス:</span>
+                {isFolderPathLoading ? (
+                  <span>読み込み中...</span>
+                ) : folderPath.length === 0 ? (
+                  <span>マイドライブ</span>
+                ) : (
+                  <div className="flex items-center gap-1 overflow-x-auto">
+                    <span>マイドライブ</span>
+                    {folderPath.map((pathFolder) => (
+                      <span key={pathFolder.id} className="flex items-center gap-1">
+                        <span className="text-[#9aa0a6]">/</span>
+                        <a
+                          href={`https://drive.google.com/drive/folders/${pathFolder.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-[#1a73e8] hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {pathFolder.name}
+                        </a>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="p-4 text-center">
               <svg className="w-6 h-6 text-[#1a73e8] animate-spin mx-auto" viewBox="0 0 24 24" fill="none">
@@ -824,10 +866,23 @@ export function FilesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('files');
   const [riskLevelFilter, setRiskLevelFilter] = useState<RiskLevel | 'all'>('all');
   const [ownerTypeFilter, setOwnerTypeFilter] = useState<OwnerType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'riskScore' | 'name' | 'modifiedTime'>('riskScore');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [offset, setOffset] = useState(0);
   const [folderOffset, setFolderOffset] = useState(0);
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
   const limit = 20;
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setOffset(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // 一括操作用の状態
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -851,14 +906,17 @@ export function FilesPage() {
   });
 
   // Get files
-  const { data: filesData, isLoading, isError } = useQuery({
-    queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, offset],
+  const { data: filesData, isLoading, isError, isFetching } = useQuery({
+    queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, debouncedSearch, sortBy, sortOrder, offset],
     queryFn: () =>
       scanApi.getFiles(scanId!, {
         limit,
         offset,
         riskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
         ownerType: ownerTypeFilter === 'all' ? undefined : ownerTypeFilter,
+        search: debouncedSearch || undefined,
+        sortBy,
+        sortOrder,
       }),
     enabled: !!scanId && viewMode === 'files',
   });
@@ -1129,10 +1187,61 @@ export function FilesPage() {
               </div>
             </div>
           )}
+
+          {/* Search & Sort (only for files view) */}
+          {viewMode === 'files' && (
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Search */}
+              <div className="relative">
+                <svg className="w-4 h-4 text-[#5f6368] absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="ファイル名で検索..."
+                  className="w-64 pl-9 pr-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-[#f1f3f4] rounded-full"
+                  >
+                    <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Sort */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[#5f6368]">並び替え:</span>
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-') as ['riskScore' | 'name' | 'modifiedTime', 'asc' | 'desc'];
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                    setOffset(0);
+                  }}
+                  className="px-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent bg-white"
+                >
+                  <option value="riskScore-desc">リスク高い順</option>
+                  <option value="riskScore-asc">リスク低い順</option>
+                  <option value="name-asc">ファイル名 A-Z</option>
+                  <option value="name-desc">ファイル名 Z-A</option>
+                  <option value="modifiedTime-desc">更新日新しい順</option>
+                  <option value="modifiedTime-asc">更新日古い順</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filter info */}
-        {(riskLevelFilter !== 'all' || ownerTypeFilter !== 'all') && (
+        {(riskLevelFilter !== 'all' || ownerTypeFilter !== 'all' || debouncedSearch) && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm text-[#5f6368]">フィルター:</span>
             {riskLevelFilter !== 'all' && (
@@ -1145,10 +1254,16 @@ export function FilesPage() {
                 {ownerTypeFilter === 'internal' ? '自社所有' : '外部所有'}
               </span>
             )}
+            {debouncedSearch && (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-[#f1f3f4] text-[#5f6368]">
+                検索: "{debouncedSearch}"
+              </span>
+            )}
             <button
               onClick={() => {
                 setRiskLevelFilter('all');
                 setOwnerTypeFilter('all');
+                setSearchQuery('');
                 setOffset(0);
               }}
               className="text-sm text-[#1a73e8] hover:underline"
@@ -1316,7 +1431,16 @@ export function FilesPage() {
                   <p className="mt-2 text-sm text-[#5f6368]">該当するファイルがありません</p>
                 </div>
               ) : (
-                <div>
+                <div className="relative">
+                  {/* Fetching overlay for search/filter operations */}
+                  {isFetching && (
+                    <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+                      <svg className="w-6 h-6 text-[#1a73e8] animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    </div>
+                  )}
                   {files.map((file) => (
                     <FileRow
                       key={file.id}

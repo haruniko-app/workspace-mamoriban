@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { NotificationSettingsService, NotificationLogService } from '../services/firestore.js';
 import type { NotificationSettings } from '../types/models.js';
 
 const router = Router();
+
+// 全ルートに認証を適用
+router.use(requireAuth);
 
 /**
  * GET /api/notifications/settings
