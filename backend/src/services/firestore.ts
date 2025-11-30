@@ -1,5 +1,5 @@
 import { Firestore } from '@google-cloud/firestore';
-import type { Organization, User, Scan, ScannedFile, ActionLog, NotificationSettings, NotificationLog } from '../types/models.js';
+import type { Organization, User, Scan, ScannedFile, ActionLog, NotificationSettings, NotificationLog, ServiceAccountConfig, IntegratedScanJob, IntegratedScanUserResult } from '../types/models.js';
 
 // Firestore初期化
 const firestore = new Firestore({
@@ -13,6 +13,7 @@ const scansRef = firestore.collection('scans');
 const actionLogsRef = firestore.collection('actionLogs');
 const notificationSettingsRef = firestore.collection('notificationSettings');
 const notificationLogsRef = firestore.collection('notificationLogs');
+const integratedScanJobsRef = firestore.collection('integratedScanJobs');
 
 /**
  * Firestore Timestampを Date または ISO文字列に変換
@@ -118,6 +119,58 @@ export const OrganizationService = {
         lastScanAt: new Date(),
         updatedAt: new Date(),
       });
+    });
+  },
+
+  /**
+   * サービスアカウント設定を保存
+   */
+  async saveServiceAccountConfig(
+    id: string,
+    config: ServiceAccountConfig
+  ): Promise<void> {
+    await organizationsRef.doc(id).update({
+      serviceAccountConfig: config,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * サービスアカウント設定を取得
+   */
+  async getServiceAccountConfig(id: string): Promise<ServiceAccountConfig | null> {
+    const org = await this.getById(id);
+    return org?.serviceAccountConfig || null;
+  },
+
+  /**
+   * サービスアカウント検証状態を更新
+   */
+  async updateServiceAccountVerification(
+    id: string,
+    status: 'pending' | 'verified' | 'failed',
+    error?: string
+  ): Promise<void> {
+    const org = await this.getById(id);
+    if (!org?.serviceAccountConfig) {
+      throw new Error('Service account not configured');
+    }
+
+    await organizationsRef.doc(id).update({
+      'serviceAccountConfig.verificationStatus': status,
+      'serviceAccountConfig.lastVerifiedAt': new Date(),
+      'serviceAccountConfig.verificationError': error || null,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * サービスアカウント設定を削除
+   */
+  async deleteServiceAccountConfig(id: string): Promise<void> {
+    await organizationsRef.doc(id).update({
+      serviceAccountConfig: null,
+      updatedAt: new Date(),
     });
   },
 };
@@ -976,6 +1029,219 @@ export const NotificationLogService = {
     });
 
     return { logs, total };
+  },
+};
+
+/**
+ * 統合スキャンジョブ関連の操作
+ */
+export const IntegratedScanJobService = {
+  /**
+   * ジョブを作成
+   */
+  async create(data: Omit<IntegratedScanJob, 'id' | 'createdAt' | 'updatedAt'>): Promise<IntegratedScanJob> {
+    const docRef = integratedScanJobsRef.doc();
+    const now = new Date();
+    const job: IntegratedScanJob = {
+      ...data,
+      id: docRef.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await docRef.set(job);
+    return job;
+  },
+
+  /**
+   * ジョブをIDで取得
+   */
+  async getById(id: string): Promise<IntegratedScanJob | null> {
+    const doc = await integratedScanJobsRef.doc(id).get();
+    if (!doc.exists) return null;
+    const data = doc.data() as IntegratedScanJob;
+    return {
+      ...data,
+      startedAt: toISOString(data.startedAt) as unknown as Date,
+      completedAt: toISOString(data.completedAt) as unknown as Date,
+      createdAt: toISOString(data.createdAt) as unknown as Date,
+      updatedAt: toISOString(data.updatedAt) as unknown as Date,
+    };
+  },
+
+  /**
+   * 組織のアクティブなジョブを取得
+   */
+  async getActiveByOrganization(organizationId: string): Promise<IntegratedScanJob | null> {
+    const snapshot = await integratedScanJobsRef
+      .where('organizationId', '==', organizationId)
+      .where('status', 'in', ['pending', 'running'])
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+    const data = snapshot.docs[0].data() as IntegratedScanJob;
+    return {
+      ...data,
+      startedAt: toISOString(data.startedAt) as unknown as Date,
+      completedAt: toISOString(data.completedAt) as unknown as Date,
+      createdAt: toISOString(data.createdAt) as unknown as Date,
+      updatedAt: toISOString(data.updatedAt) as unknown as Date,
+    };
+  },
+
+  /**
+   * 組織の最新ジョブを取得（完了・失敗含む）
+   */
+  async getLatestByOrganization(organizationId: string): Promise<IntegratedScanJob | null> {
+    const snapshot = await integratedScanJobsRef
+      .where('organizationId', '==', organizationId)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+    const data = snapshot.docs[0].data() as IntegratedScanJob;
+    return {
+      ...data,
+      startedAt: toISOString(data.startedAt) as unknown as Date,
+      completedAt: toISOString(data.completedAt) as unknown as Date,
+      createdAt: toISOString(data.createdAt) as unknown as Date,
+      updatedAt: toISOString(data.updatedAt) as unknown as Date,
+    };
+  },
+
+  /**
+   * ジョブのステータスを更新
+   */
+  async updateStatus(
+    id: string,
+    status: IntegratedScanJob['status'],
+    updates?: Partial<IntegratedScanJob>
+  ): Promise<void> {
+    await integratedScanJobsRef.doc(id).update({
+      status,
+      ...updates,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * 現在処理中のユーザーを更新
+   */
+  async updateCurrentUser(
+    id: string,
+    currentUserEmail: string | null,
+    processedUsers: number
+  ): Promise<void> {
+    await integratedScanJobsRef.doc(id).update({
+      currentUserEmail,
+      processedUsers,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * ユーザー結果を更新
+   */
+  async updateUserResult(
+    id: string,
+    userIndex: number,
+    result: Partial<IntegratedScanUserResult>
+  ): Promise<void> {
+    const job = await this.getById(id);
+    if (!job) throw new Error('Job not found');
+
+    const userResults = [...job.userResults];
+    userResults[userIndex] = {
+      ...userResults[userIndex],
+      ...result,
+    };
+
+    // 集計を更新
+    const totalRiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+    let totalFilesScanned = 0;
+
+    for (const ur of userResults) {
+      if (ur.status === 'completed') {
+        totalRiskySummary.critical += ur.riskySummary.critical;
+        totalRiskySummary.high += ur.riskySummary.high;
+        totalRiskySummary.medium += ur.riskySummary.medium;
+        totalRiskySummary.low += ur.riskySummary.low;
+        totalFilesScanned += ur.filesScanned;
+      }
+    }
+
+    await integratedScanJobsRef.doc(id).update({
+      userResults,
+      totalRiskySummary,
+      totalFilesScanned,
+      lastProcessedUserIndex: result.status === 'completed' || result.status === 'failed' || result.status === 'skipped'
+        ? userIndex
+        : job.lastProcessedUserIndex,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * ジョブを完了としてマーク
+   */
+  async complete(id: string, errorMessage?: string): Promise<void> {
+    await integratedScanJobsRef.doc(id).update({
+      status: errorMessage ? 'failed' : 'completed',
+      completedAt: new Date(),
+      errorMessage: errorMessage || null,
+      currentUserEmail: null,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * ジョブをキャンセル
+   */
+  async cancel(id: string): Promise<void> {
+    await integratedScanJobsRef.doc(id).update({
+      status: 'cancelled',
+      completedAt: new Date(),
+      currentUserEmail: null,
+      updatedAt: new Date(),
+    });
+  },
+
+  /**
+   * 組織のジョブ履歴を取得
+   */
+  async getByOrganization(
+    organizationId: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<{ jobs: IntegratedScanJob[]; total: number }> {
+    const { limit = 10, offset = 0 } = options;
+
+    const countSnapshot = await integratedScanJobsRef
+      .where('organizationId', '==', organizationId)
+      .count()
+      .get();
+    const total = countSnapshot.data().count;
+
+    const snapshot = await integratedScanJobsRef
+      .where('organizationId', '==', organizationId)
+      .orderBy('createdAt', 'desc')
+      .limit(limit + offset)
+      .get();
+
+    const allJobs = snapshot.docs.map((doc) => {
+      const data = doc.data() as IntegratedScanJob;
+      return {
+        ...data,
+        startedAt: toISOString(data.startedAt) as unknown as Date,
+        completedAt: toISOString(data.completedAt) as unknown as Date,
+        createdAt: toISOString(data.createdAt) as unknown as Date,
+        updatedAt: toISOString(data.updatedAt) as unknown as Date,
+      };
+    });
+    const jobs = allJobs.slice(offset, offset + limit);
+
+    return { jobs, total };
   },
 };
 

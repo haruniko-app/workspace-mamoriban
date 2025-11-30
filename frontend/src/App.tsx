@@ -15,6 +15,7 @@ import { AuditLogsPage } from './pages/AuditLogsPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import DelegationPage from './pages/DelegationPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -114,6 +115,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/delegation"
+              element={
+                <ProtectedRoute>
+                  <DelegationPage />
                 </ProtectedRoute>
               }
             />

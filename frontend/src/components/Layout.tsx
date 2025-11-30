@@ -20,6 +20,7 @@ const adminNavigation = [
   { name: '管理者ダッシュボード', href: '/admin', icon: AdminIcon },
   { name: 'ISMS/Pマークレポート', href: '/reports', icon: ReportIcon },
   { name: '通知設定', href: '/notifications', icon: NotificationIcon },
+  { name: '統合スキャン設定', href: '/delegation', icon: DelegationIcon },
 ];
 
 // Google Material Icons style
@@ -83,6 +84,14 @@ function NotificationIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+    </svg>
+  );
+}
+
+function DelegationIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z" />
     </svg>
   );
 }

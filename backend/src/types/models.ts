@@ -22,9 +22,30 @@ export interface Organization {
   totalFilesScanned: number;
   lastScanAt: Date | null;
 
+  // Domain-Wide Delegation設定
+  serviceAccountConfig?: ServiceAccountConfig | null;
+
   // メタデータ
   createdAt: Date;
   updatedAt: Date;
+}
+
+// サービスアカウント設定（Domain-Wide Delegation用）
+export interface ServiceAccountConfig {
+  // サービスアカウントのメールアドレス
+  clientEmail: string;
+  // 秘密鍵（暗号化して保存推奨）
+  privateKey: string;
+  // 設定日時
+  configuredAt: Date;
+  // 設定したユーザー
+  configuredBy: string;
+  // 最後に検証された日時
+  lastVerifiedAt: Date | null;
+  // 検証状態
+  verificationStatus: 'pending' | 'verified' | 'failed';
+  // 失敗時のエラーメッセージ
+  verificationError: string | null;
 }
 
 // ユーザー（組織に所属）
@@ -260,4 +281,70 @@ export interface NotificationLog {
   errorMessage?: string;
 
   createdAt: Date;
+}
+
+// 統合スキャンジョブ（Domain-Wide Delegation用）
+export interface IntegratedScanJob {
+  id: string;
+  organizationId: string;
+
+  // 開始者情報
+  initiatorUserId: string;
+  initiatorEmail: string;
+  initiatorName: string;
+
+  // 全体ステータス
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+  // ユーザー情報
+  totalUsers: number;
+  processedUsers: number;
+  currentUserEmail: string | null;  // 現在処理中のユーザー
+
+  // 対象ユーザー一覧
+  targetUsers: {
+    email: string;
+    displayName: string;
+  }[];
+
+  // 各ユーザーの結果
+  userResults: IntegratedScanUserResult[];
+
+  // 集計サマリー
+  totalRiskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  totalFilesScanned: number;
+
+  // 実行情報
+  startedAt: Date;
+  completedAt: Date | null;
+  errorMessage: string | null;
+
+  // 再開用情報
+  lastProcessedUserIndex: number;  // 最後に処理完了したユーザーのインデックス
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// 統合スキャンの各ユーザー結果
+export interface IntegratedScanUserResult {
+  userEmail: string;
+  userName: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  scanId: string | null;           // 作成されたスキャンID
+  filesScanned: number;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  errorMessage: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
 }

@@ -16,6 +16,7 @@ import stripeRoutes from './routes/stripe.js';
 import auditLogRoutes from './routes/auditLogs.js';
 import reportRoutes from './routes/reports.js';
 import notificationRoutes from './routes/notifications.js';
+import delegationRoutes from './routes/delegation.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -77,6 +78,9 @@ app.use('/api/reports', reportRoutes);
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);
+
+// Domain-Wide Delegation routes
+app.use('/api/delegation', delegationRoutes);
 
 app.listen(PORT, () => {
   console.log(`🛡️ Workspace守り番 Backend running on port ${PORT}`);

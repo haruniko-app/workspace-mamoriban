@@ -55,6 +55,7 @@ export const api = {
 // Auth API
 export const authApi = {
   getLoginUrl: () => `${API_BASE}/api/auth/login`,
+  getReauthorizeUrl: () => `${API_BASE}/api/auth/reauthorize`,
   getMe: () => api.get<{ user: User }>('/api/auth/me'),
   logout: () => api.post<{ message: string }>('/api/auth/logout'),
   refresh: () => api.post<{ message: string }>('/api/auth/refresh'),
@@ -151,6 +152,16 @@ export const scanApi = {
   getFolderPath: (scanId: string, fileId: string) =>
     api.get<{ fileId: string; folderPath: FolderPathItem[] }>(
       `/api/scan/${scanId}/files/${fileId}/folder-path`
+    ),
+  // Folder permission management
+  deleteFolderPermission: (scanId: string, folderId: string, permissionId: string) =>
+    api.delete<{ success: boolean; message: string; folderId: string; permissionId: string }>(
+      `/api/scan/${scanId}/folders/${folderId}/folder-permissions/${permissionId}`
+    ),
+  updateFolderPermissionRole: (scanId: string, folderId: string, permissionId: string, role: 'reader' | 'commenter' | 'writer') =>
+    api.put<{ success: boolean; message: string; folderId: string; permissionId: string; permission: ScannedFile['permissions'][0] }>(
+      `/api/scan/${scanId}/folders/${folderId}/folder-permissions/${permissionId}`,
+      { role }
     ),
   // 管理者用API
   admin: {
@@ -528,6 +539,24 @@ export interface UserScanSummary {
   totalFiles: number;
 }
 
+// PDF download helper
+const downloadPdf = async (endpoint: string, filename: string) => {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('PDF generation failed');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 // Reports API (ISMS/Pマーク対応)
 export const reportsApi = {
   // スキャン実施履歴レポート
@@ -540,9 +569,24 @@ export const reportsApi = {
       Object.keys(params).length > 0 ? { params } : undefined
     );
   },
+  getScanHistoryPdf: (options?: { startDate?: string; endDate?: string }) => {
+    const params = new URLSearchParams();
+    if (options?.startDate) params.append('startDate', options.startDate);
+    if (options?.endDate) params.append('endDate', options.endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return downloadPdf(
+      `/api/reports/scan-history/pdf${query}`,
+      `scan-history-report-${new Date().toISOString().split('T')[0]}.pdf`
+    );
+  },
   // リスクアセスメントレポート
   getRiskAssessment: (scanId: string) =>
     api.get<{ report: RiskAssessmentReport }>(`/api/reports/risk-assessment/${scanId}`),
+  getRiskAssessmentPdf: (scanId: string) =>
+    downloadPdf(
+      `/api/reports/risk-assessment/${scanId}/pdf`,
+      `risk-assessment-report-${scanId}-${new Date().toISOString().split('T')[0]}.pdf`
+    ),
   // 是正対応履歴レポート
   getRemediationHistory: (options?: { startDate?: string; endDate?: string }) => {
     const params: Record<string, string> = {};
@@ -553,12 +597,32 @@ export const reportsApi = {
       Object.keys(params).length > 0 ? { params } : undefined
     );
   },
+  getRemediationHistoryPdf: (options?: { startDate?: string; endDate?: string }) => {
+    const params = new URLSearchParams();
+    if (options?.startDate) params.append('startDate', options.startDate);
+    if (options?.endDate) params.append('endDate', options.endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return downloadPdf(
+      `/api/reports/remediation-history/pdf${query}`,
+      `remediation-history-report-${new Date().toISOString().split('T')[0]}.pdf`
+    );
+  },
   // 外部共有一覧レポート
   getExternalSharing: (scanId: string) =>
     api.get<{ report: ExternalSharingReport }>(`/api/reports/external-sharing/${scanId}`),
+  getExternalSharingPdf: (scanId: string) =>
+    downloadPdf(
+      `/api/reports/external-sharing/${scanId}/pdf`,
+      `external-sharing-report-${scanId}-${new Date().toISOString().split('T')[0]}.pdf`
+    ),
   // 現在のリスク状況レポート
   getCurrentRisks: () =>
     api.get<{ report: CurrentRisksReport }>('/api/reports/current-risks'),
+  getCurrentRisksPdf: () =>
+    downloadPdf(
+      '/api/reports/current-risks/pdf',
+      `current-risks-report-${new Date().toISOString().split('T')[0]}.pdf`
+    ),
 };
 
 // レポート型定義
@@ -834,4 +898,132 @@ export interface NotificationLog {
   success: boolean;
   errorMessage?: string;
   createdAt: string;
+}
+
+// Domain-Wide Delegation API
+export const delegationApi = {
+  // 設定状態を取得
+  getStatus: () =>
+    api.get<DelegationStatus>('/api/delegation/status'),
+
+  // サービスアカウントを設定
+  configure: (serviceAccountJson: string) =>
+    api.post<ConfigureResult>('/api/delegation/configure', { serviceAccountJson }),
+
+  // 設定を検証
+  verify: () =>
+    api.post<VerifyResult>('/api/delegation/verify'),
+
+  // 設定を削除
+  delete: () =>
+    api.delete<{ success: boolean; message: string }>('/api/delegation'),
+
+  // 組織内ユーザー一覧を取得
+  getUsers: () =>
+    api.get<{ users: DomainUser[]; totalCount: number }>('/api/delegation/users'),
+
+  // 設定ガイドを取得
+  getSetupGuide: () =>
+    api.get<SetupGuide>('/api/delegation/setup-guide'),
+};
+
+// Domain-Wide Delegation型定義
+export interface DelegationStatus {
+  configured: boolean;
+  verificationStatus: 'pending' | 'verified' | 'failed' | null;
+  clientEmail: string | null;
+  configuredAt: string | null;
+  lastVerifiedAt: string | null;
+  verificationError: string | null;
+}
+
+export interface ConfigureResult {
+  success: boolean;
+  message: string;
+  clientEmail: string;
+  clientId: string | null;
+  requiredScopes: string[];
+}
+
+export interface VerifyResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  userCount?: number;
+}
+
+export interface DomainUser {
+  email: string;
+  displayName: string;
+  isAdmin: boolean;
+}
+
+export interface SetupGuide {
+  requiredScopes: string[];
+  clientEmail: string | null;
+  steps: {
+    step: number;
+    title: string;
+    description: string;
+    link?: string;
+    scopesToAdd?: string;
+  }[];
+}
+
+// 統合スキャンAPI
+export const integratedScanApi = {
+  // 統合スキャンを開始
+  start: (userEmails?: string[]) =>
+    api.post<{
+      success: boolean;
+      message: string;
+      jobId: string;
+      targetUsers: number;
+    }>('/api/delegation/scan/start', userEmails ? { userEmails } : {}),
+
+  // 統合スキャンの進捗を取得
+  getStatus: () =>
+    api.get<IntegratedScanStatusResponse>('/api/delegation/scan/status'),
+
+  // 統合スキャンをキャンセル
+  cancel: () =>
+    api.post<{ success: boolean; message: string }>('/api/delegation/scan/cancel'),
+};
+
+export interface IntegratedScanStatusResponse {
+  hasActiveScan: boolean;
+  status: IntegratedScanStatus | null;
+}
+
+export interface IntegratedScanStatus {
+  jobId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  totalUsers: number;
+  processedUsers: number;
+  currentUser: string | null;
+  userResults: IntegratedScanUserResult[];
+  totalRiskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  totalFilesScanned: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface IntegratedScanUserResult {
+  email: string;
+  displayName: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  scanId: string | null;
+  filesScanned: number;
+  riskySummary: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  error?: string;
 }
