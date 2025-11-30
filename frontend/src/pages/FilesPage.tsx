@@ -83,17 +83,59 @@ function FileDetailModal({
     },
   });
 
+  // Folder permission delete mutation
+  const folderDeleteMutation = useMutation({
+    mutationFn: ({ folderId, permissionId }: { folderId: string; permissionId: string }) =>
+      scanApi.deleteFolderPermission(scanId, folderId, permissionId),
+    onSuccess: () => {
+      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました' });
+      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      setTimeout(() => setOperationResult(null), 3000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の削除に失敗しました' });
+    },
+  });
+
+  // Folder permission demote mutation
+  const folderDemoteMutation = useMutation({
+    mutationFn: ({ folderId, permissionId }: { folderId: string; permissionId: string }) =>
+      scanApi.updateFolderPermissionRole(scanId, folderId, permissionId, 'reader'),
+    onSuccess: () => {
+      setOperationResult({ type: 'success', message: 'フォルダ権限を閲覧者に変更しました' });
+      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      setTimeout(() => setOperationResult(null), 3000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の変更に失敗しました' });
+    },
+  });
+
   const handleConfirm = () => {
     if (!confirmDialog) return;
-    if (confirmDialog.type === 'delete') {
-      deleteMutation.mutate({ permissionId: confirmDialog.permissionId });
+    if (confirmDialog.folderId) {
+      // Folder permission operation
+      if (confirmDialog.type === 'delete') {
+        folderDeleteMutation.mutate({ folderId: confirmDialog.folderId, permissionId: confirmDialog.permissionId });
+      } else {
+        folderDemoteMutation.mutate({ folderId: confirmDialog.folderId, permissionId: confirmDialog.permissionId });
+      }
     } else {
-      demoteMutation.mutate({ permissionId: confirmDialog.permissionId });
+      // File permission operation
+      if (confirmDialog.type === 'delete') {
+        deleteMutation.mutate({ permissionId: confirmDialog.permissionId });
+      } else {
+        demoteMutation.mutate({ permissionId: confirmDialog.permissionId });
+      }
     }
     setConfirmDialog(null);
   };
 
-  const isLoading = deleteMutation.isPending || demoteMutation.isPending;
+  const isLoading = deleteMutation.isPending || demoteMutation.isPending || folderDeleteMutation.isPending || folderDemoteMutation.isPending;
 
   // Google Drive共有設定URLを生成
   const getShareUrl = (fileId: string) => {
@@ -292,6 +334,49 @@ function FileDetailModal({
                           ? 'コメント可'
                           : '閲覧者'}
                       </span>
+                      {/* Folder Permission Action Buttons */}
+                      {perm.role !== 'owner' && file.isInternalOwner && (
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          {['writer', 'organizer', 'fileOrganizer'].includes(perm.role) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDialog({
+                                  type: 'demote',
+                                  permissionId: perm.id,
+                                  permissionLabel: getPermissionLabel(perm),
+                                  folderId: selectedFolder.id,
+                                });
+                              }}
+                              disabled={isLoading}
+                              className="p-1 text-[#5f6368] hover:bg-[#e8eaed] rounded transition-colors disabled:opacity-50"
+                              title="閲覧者に変更"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 4c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8m0-2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-6h3l-4-4-4 4h3v6z" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDialog({
+                                type: 'delete',
+                                permissionId: perm.id,
+                                permissionLabel: getPermissionLabel(perm),
+                                folderId: selectedFolder.id,
+                              });
+                            }}
+                            disabled={isLoading}
+                            className="p-1 text-[#c5221f] hover:bg-[#fce8e6] rounded transition-colors disabled:opacity-50"
+                            title="アクセスを削除"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -468,12 +553,18 @@ function FileDetailModal({
           <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setConfirmDialog(null)} />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] bg-white rounded-xl shadow-xl z-[60] p-6">
             <h3 className="text-lg font-medium text-[#202124] mb-2">
-              {confirmDialog.type === 'delete' ? 'アクセス権を削除しますか？' : '閲覧者に変更しますか？'}
+              {confirmDialog.folderId
+                ? (confirmDialog.type === 'delete' ? 'フォルダのアクセス権を削除しますか？' : 'フォルダ権限を閲覧者に変更しますか？')
+                : (confirmDialog.type === 'delete' ? 'アクセス権を削除しますか？' : '閲覧者に変更しますか？')}
             </h3>
             <p className="text-sm text-[#5f6368] mb-6">
-              {confirmDialog.type === 'delete'
-                ? `「${confirmDialog.permissionLabel}」のアクセス権を削除します。この操作は取り消せません。`
-                : `「${confirmDialog.permissionLabel}」を閲覧者に変更します。`}
+              {confirmDialog.folderId
+                ? (confirmDialog.type === 'delete'
+                  ? `フォルダの「${confirmDialog.permissionLabel}」のアクセス権を削除します。フォルダ内の全ファイルに影響します。この操作は取り消せません。`
+                  : `フォルダの「${confirmDialog.permissionLabel}」を閲覧者に変更します。フォルダ内の全ファイルに影響します。`)
+                : (confirmDialog.type === 'delete'
+                  ? `「${confirmDialog.permissionLabel}」のアクセス権を削除します。この操作は取り消せません。`
+                  : `「${confirmDialog.permissionLabel}」を閲覧者に変更します。`)}
             </p>
             <div className="flex gap-3 justify-end">
               <button

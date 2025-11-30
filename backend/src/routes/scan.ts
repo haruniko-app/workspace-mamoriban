@@ -695,6 +695,13 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
     });
   } catch (err) {
     console.error('Delete permission error:', err);
+    console.error('Error details:', {
+      scanId,
+      fileId,
+      permissionId,
+      errorMessage: err instanceof Error ? err.message : 'Unknown error',
+      errorStack: err instanceof Error ? err.stack : undefined,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1341,6 +1348,169 @@ router.delete('/:scanId/folders/:folderId/permissions', async (req: Request, res
     });
   } catch (err) {
     console.error('Delete folder permissions error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ========================================
+// フォルダ自体の権限変更API
+// ========================================
+
+/**
+ * DELETE /api/scan/:scanId/folders/:folderId/folder-permissions/:permissionId
+ * フォルダ自体の権限を削除
+ */
+router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', async (req: Request, res: Response) => {
+  const { scanId, folderId, permissionId } = req.params;
+  const organization = req.organization!;
+  const user = req.user!;
+
+  try {
+    // スキャンの存在確認と権限チェック
+    const scan = await ScanService.getById(scanId);
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+    if (scan.organizationId !== organization.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // admin/ownerのみ権限変更可能
+    if (user.role !== 'admin' && user.role !== 'owner') {
+      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
+    }
+
+    // アクセストークンの確認
+    if (!req.session.accessToken) {
+      return res.status(401).json({ error: 'Access token not available' });
+    }
+
+    const drive = createDriveClient(req.session.accessToken);
+
+    // フォルダ名を取得（ログ用）
+    let folderName = folderId;
+    try {
+      const folder = await drive.files.get({ fileId: folderId, fields: 'name' });
+      folderName = folder.data.name || folderId;
+    } catch {
+      // フォルダ名取得に失敗してもエラーにはしない
+    }
+
+    // フォルダの権限を削除（フォルダもファイルと同じDrive APIを使用）
+    const result = await deletePermission(drive, folderId, permissionId);
+
+    // アクションログを記録
+    await ActionLogService.logPermissionChange({
+      organizationId: organization.id,
+      userId: user.id,
+      userEmail: user.email,
+      actionType: 'permission_delete',
+      targetType: 'folder',
+      targetId: folderId,
+      targetName: folderName,
+      details: {
+        permissionId,
+      },
+      success: result.success,
+      errorMessage: result.error,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || '権限の削除に失敗しました' });
+    }
+
+    res.json({
+      success: true,
+      message: 'フォルダ権限を削除しました',
+      folderId,
+      permissionId,
+    });
+  } catch (err) {
+    console.error('Delete folder permission error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/scan/:scanId/folders/:folderId/folder-permissions/:permissionId
+ * フォルダ自体の権限ロールを更新
+ */
+router.put('/:scanId/folders/:folderId/folder-permissions/:permissionId', async (req: Request, res: Response) => {
+  const { scanId, folderId, permissionId } = req.params;
+  const { role } = req.body;
+  const organization = req.organization!;
+  const user = req.user!;
+
+  // ロールのバリデーション
+  const validRoles = ['reader', 'commenter', 'writer'];
+  if (!role || !validRoles.includes(role)) {
+    return res.status(400).json({ error: '有効なロールを指定してください: reader, commenter, writer' });
+  }
+
+  try {
+    // スキャンの存在確認と権限チェック
+    const scan = await ScanService.getById(scanId);
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+    if (scan.organizationId !== organization.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // admin/ownerのみ権限変更可能
+    if (user.role !== 'admin' && user.role !== 'owner') {
+      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
+    }
+
+    // アクセストークンの確認
+    if (!req.session.accessToken) {
+      return res.status(401).json({ error: 'Access token not available' });
+    }
+
+    const drive = createDriveClient(req.session.accessToken);
+
+    // フォルダ名を取得（ログ用）
+    let folderName = folderId;
+    try {
+      const folder = await drive.files.get({ fileId: folderId, fields: 'name' });
+      folderName = folder.data.name || folderId;
+    } catch {
+      // フォルダ名取得に失敗してもエラーにはしない
+    }
+
+    // フォルダの権限を更新
+    const result = await updatePermissionRole(drive, folderId, permissionId, role);
+
+    // アクションログを記録
+    await ActionLogService.logPermissionChange({
+      organizationId: organization.id,
+      userId: user.id,
+      userEmail: user.email,
+      actionType: 'permission_update',
+      targetType: 'folder',
+      targetId: folderId,
+      targetName: folderName,
+      details: {
+        permissionId,
+        newRole: role,
+      },
+      success: result.success,
+      errorMessage: result.error,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || '権限の更新に失敗しました' });
+    }
+
+    res.json({
+      success: true,
+      message: 'フォルダ権限を更新しました',
+      folderId,
+      permissionId,
+      permission: result.permission,
+    });
+  } catch (err) {
+    console.error('Update folder permission error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

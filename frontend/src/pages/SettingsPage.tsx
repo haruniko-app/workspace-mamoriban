@@ -20,7 +20,7 @@ const PLAN_PRICES: Record<string, string> = {
 };
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, reauthorize } = useAuth();
   const [searchParams] = useSearchParams();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'enterprise' | null>(null);
@@ -391,6 +391,46 @@ export function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Google Permissions */}
+        <div className="bg-white rounded-2xl border border-[#dadce0]">
+          <div className="px-6 py-4 border-b border-[#e8eaed] flex items-center gap-3">
+            <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
+            </svg>
+            <h2 className="text-base font-medium text-[#202124]">Google権限</h2>
+          </div>
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#202124]">Google Driveアクセス権限</p>
+                <p className="text-xs text-[#5f6368] mt-0.5">
+                  ファイルの共有設定を変更するには、追加の権限が必要です。
+                  「権限を変更できない」エラーが発生した場合は、再認証してください。
+                </p>
+              </div>
+              <button
+                onClick={reauthorize}
+                className="btn-google-secondary"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                </svg>
+                Google権限を再認証
+              </button>
+            </div>
+            <div className="mt-4 p-3 bg-[#f8f9fa] rounded-lg">
+              <p className="text-xs text-[#5f6368]">
+                <strong>現在の権限:</strong> ファイルの読み取り・共有設定の変更
+              </p>
+              <ul className="mt-2 text-xs text-[#5f6368] space-y-1">
+                <li>- Google Driveファイルのメタデータ閲覧</li>
+                <li>- ファイル共有設定の閲覧・変更</li>
+                <li>- ユーザーディレクトリ情報の閲覧</li>
+              </ul>
             </div>
           </div>
         </div>

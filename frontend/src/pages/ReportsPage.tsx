@@ -146,6 +146,32 @@ export function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadPdf = async () => {
+    if (!generatedReport) return;
+    try {
+      switch (generatedReport.reportType) {
+        case 'scan_history':
+          await reportsApi.getScanHistoryPdf(dateRange);
+          break;
+        case 'risk_assessment':
+          await reportsApi.getRiskAssessmentPdf(selectedScanId);
+          break;
+        case 'remediation_history':
+          await reportsApi.getRemediationHistoryPdf(dateRange);
+          break;
+        case 'external_sharing':
+          await reportsApi.getExternalSharingPdf(selectedScanId);
+          break;
+        case 'current_risks':
+          await reportsApi.getCurrentRisksPdf();
+          break;
+      }
+    } catch (error) {
+      console.error('PDF download error:', error);
+      alert('PDFのダウンロードに失敗しました');
+    }
+  };
+
   const downloadCsv = () => {
     if (!generatedReport) return;
 
@@ -329,6 +355,12 @@ export function ReportsPage() {
                 </p>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={downloadPdf}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                >
+                  PDF
+                </button>
                 <button
                   onClick={downloadJson}
                   className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm"

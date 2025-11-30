@@ -8,6 +8,7 @@ interface AuthContextType {
   login: () => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  reauthorize: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,6 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = authApi.getLoginUrl();
   };
 
+  const reauthorize = () => {
+    window.location.href = authApi.getReauthorizeUrl();
+  };
+
   const logout = async () => {
     try {
       await authApi.logout();
@@ -58,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refresh,
+        reauthorize,
       }}
     >
       {children}

@@ -28,6 +28,16 @@ router.get('/login', (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/auth/reauthorize
+ * 追加スコープの許可を要求（強制同意画面表示）
+ * 既存ユーザーがスコープ変更時に再認証するために使用
+ */
+router.get('/reauthorize', (req: Request, res: Response) => {
+  const authUrl = generateAuthUrl(true); // forceConsent = true
+  res.redirect(authUrl);
+});
+
+/**
  * GET /api/auth/callback
  * OAuth認証コールバック
  */

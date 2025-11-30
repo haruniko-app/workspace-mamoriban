@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { scanApi, type UserScanSummary } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { Layout } from '../components/Layout';
 
 export function AdminDashboardPage() {
   const { user } = useAuth();
@@ -12,17 +13,19 @@ export function AdminDashboardPage() {
   // 管理者権限チェック
   if (user?.role === 'member') {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h2 className="text-lg font-medium text-yellow-800">アクセス権限がありません</h2>
-          <p className="mt-2 text-yellow-700">
-            このページは管理者（admin/owner）のみアクセスできます。
-          </p>
-          <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">
-            ダッシュボードに戻る
-          </Link>
+      <Layout>
+        <div className="p-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h2 className="text-lg font-medium text-yellow-800">アクセス権限がありません</h2>
+            <p className="mt-2 text-yellow-700">
+              このページは管理者（admin/owner）のみアクセスできます。
+            </p>
+            <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">
+              ダッシュボードに戻る
+            </Link>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -93,8 +96,9 @@ export function AdminDashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* ヘッダー */}
+    <Layout>
+      <div className="p-6 space-y-6">
+        {/* ヘッダー */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">管理者ダッシュボード</h1>
@@ -335,6 +339,7 @@ export function AdminDashboardPage() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }
