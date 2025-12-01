@@ -1190,6 +1190,44 @@ export const ScannedFileService = {
     const snapshot = await query.get();
     return snapshot.docs.map((doc) => doc.data() as FolderSummary);
   },
+
+  /**
+   * フォルダサマリーを別のスキャンからコピー（差分スキャン最適化用）
+   * @param sourceScanId コピー元スキャンID
+   * @param targetScanId コピー先スキャンID
+   * @returns コピーしたフォルダ数
+   */
+  async copyFolderSummaries(
+    sourceScanId: string,
+    targetScanId: string
+  ): Promise<number> {
+    const sourceRef = scansRef.doc(sourceScanId).collection('folderSummaries');
+    const targetRef = scansRef.doc(targetScanId).collection('folderSummaries');
+
+    // ソースのフォルダサマリを全て取得
+    const snapshot = await sourceRef.get();
+    if (snapshot.empty) {
+      return 0;
+    }
+
+    // バッチ書き込み（500件ずつ）
+    const BATCH_SIZE = 500;
+    const docs = snapshot.docs;
+
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = firestore.batch();
+      const chunk = docs.slice(i, i + BATCH_SIZE);
+
+      for (const doc of chunk) {
+        const summary = doc.data() as FolderSummary;
+        batch.set(targetRef.doc(doc.id), summary);
+      }
+
+      await batch.commit();
+    }
+
+    return docs.length;
+  },
 };
 
 /**
@@ -1228,8 +1266,13 @@ export const ActionLogService = {
    */
   async create(data: Omit<ActionLog, 'id' | 'createdAt'>): Promise<ActionLog> {
     const docRef = actionLogsRef.doc();
+    // detailsからundefined値を除去（Firestoreはundefinedを受け付けない）
+    const cleanedDetails = Object.fromEntries(
+      Object.entries(data.details).filter(([, value]) => value !== undefined)
+    ) as ActionLog['details'];
     const log: ActionLog = {
       ...data,
+      details: cleanedDetails,
       id: docRef.id,
       createdAt: new Date(),
     };

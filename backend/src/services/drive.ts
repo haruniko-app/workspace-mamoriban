@@ -635,6 +635,39 @@ export async function getFileFolderPath(
 }
 
 /**
+ * 単一フォルダの情報を取得（権限情報付き）
+ */
+export async function getFolderInfo(
+  drive: drive_v3.Drive,
+  folderId: string
+): Promise<FolderInfo | null> {
+  try {
+    const folderResponse: { data: drive_v3.Schema$File } = await drive.files.get({
+      fileId: folderId,
+      fields: 'id,name,parents,permissions(id,type,role,emailAddress,domain,displayName)',
+    });
+
+    const folder: drive_v3.Schema$File = folderResponse.data;
+
+    return {
+      id: folderId,
+      name: folder.name || '',
+      permissions: (folder.permissions || []).map((perm: drive_v3.Schema$Permission) => ({
+        id: perm.id || '',
+        type: perm.type as DrivePermission['type'],
+        role: perm.role as DrivePermission['role'],
+        emailAddress: perm.emailAddress || null,
+        domain: perm.domain || null,
+        displayName: perm.displayName || null,
+      })),
+    };
+  } catch (error) {
+    console.warn(`Failed to get folder info for ${folderId}:`, error);
+    return null;
+  }
+}
+
+/**
  * 変更トークン関連の型定義
  */
 export interface DriveChange {

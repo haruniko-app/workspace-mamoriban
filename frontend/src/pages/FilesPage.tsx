@@ -33,10 +33,30 @@ function FileDetailModal({
 }) {
   const config = RISK_LEVEL_CONFIG[file.riskLevel];
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // ファイル/フォルダの権限変更が可能かチェック
+  // admin/owner ロール、またはファイルオーナーなら可能
+  const canModifyFilePermission = (fileToCheck: ScannedFile) => {
+    if (!user) return false;
+    if (user.role === 'admin' || user.role === 'owner') return true;
+    // ファイルオーナーなら自分のファイルを変更可能（内部所有の場合のみ）
+    return fileToCheck.isInternalOwner && fileToCheck.ownerEmail === user.email;
+  };
+
+  // フォルダの権限変更が可能かチェック
+  const canModifyFolderPermission = (folderPermissions: ScannedFile['permissions']) => {
+    if (!user) return false;
+    if (user.role === 'admin' || user.role === 'owner') return true;
+    // フォルダオーナーなら自分のフォルダを変更可能
+    const ownerPerm = folderPermissions.find(p => p.role === 'owner');
+    return ownerPerm?.emailAddress === user.email;
+  };
   const [confirmDialog, setConfirmDialog] = useState<{
-    type: 'delete' | 'demote';
+    type: 'delete' | 'changeRole';
     permissionId: string;
     permissionLabel: string;
+    newRole?: 'reader' | 'commenter' | 'writer';
     folderId?: string;
   } | null>(null);
   const [operationResult, setOperationResult] = useState<{
@@ -69,12 +89,13 @@ function FileDetailModal({
     },
   });
 
-  // Permission demote mutation
-  const demoteMutation = useMutation({
-    mutationFn: ({ permissionId }: { permissionId: string }) =>
-      scanApi.updatePermissionRole(scanId, file.id, permissionId, 'reader'),
-    onSuccess: () => {
-      setOperationResult({ type: 'success', message: '閲覧者に変更しました' });
+  // Permission role change mutation
+  const changeRoleMutation = useMutation({
+    mutationFn: ({ permissionId, role }: { permissionId: string; role: 'reader' | 'commenter' | 'writer' }) =>
+      scanApi.updatePermissionRole(scanId, file.id, permissionId, role),
+    onSuccess: (_, variables) => {
+      const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
+      setOperationResult({ type: 'success', message: `${roleLabel}に変更しました` });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
       onPermissionChange?.();
@@ -101,12 +122,13 @@ function FileDetailModal({
     },
   });
 
-  // Folder permission demote mutation
-  const folderDemoteMutation = useMutation({
-    mutationFn: ({ folderId, permissionId }: { folderId: string; permissionId: string }) =>
-      scanApi.updateFolderPermissionRole(scanId, folderId, permissionId, 'reader'),
-    onSuccess: () => {
-      setOperationResult({ type: 'success', message: 'フォルダ権限を閲覧者に変更しました' });
+  // Folder permission role change mutation
+  const folderChangeRoleMutation = useMutation({
+    mutationFn: ({ folderId, permissionId, role }: { folderId: string; permissionId: string; role: 'reader' | 'commenter' | 'writer' }) =>
+      scanApi.updateFolderPermissionRole(scanId, folderId, permissionId, role),
+    onSuccess: (_, variables) => {
+      const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
+      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました` });
       queryClient.invalidateQueries({ queryKey: ['folderPath'] });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
@@ -123,35 +145,44 @@ function FileDetailModal({
       // Folder permission operation
       if (confirmDialog.type === 'delete') {
         folderDeleteMutation.mutate({ folderId: confirmDialog.folderId, permissionId: confirmDialog.permissionId });
-      } else {
-        folderDemoteMutation.mutate({ folderId: confirmDialog.folderId, permissionId: confirmDialog.permissionId });
+      } else if (confirmDialog.type === 'changeRole' && confirmDialog.newRole) {
+        folderChangeRoleMutation.mutate({ folderId: confirmDialog.folderId, permissionId: confirmDialog.permissionId, role: confirmDialog.newRole });
       }
     } else {
       // File permission operation
       if (confirmDialog.type === 'delete') {
         deleteMutation.mutate({ permissionId: confirmDialog.permissionId });
-      } else {
-        demoteMutation.mutate({ permissionId: confirmDialog.permissionId });
+      } else if (confirmDialog.type === 'changeRole' && confirmDialog.newRole) {
+        changeRoleMutation.mutate({ permissionId: confirmDialog.permissionId, role: confirmDialog.newRole });
       }
     }
     setConfirmDialog(null);
   };
 
-  const isLoading = deleteMutation.isPending || demoteMutation.isPending || folderDeleteMutation.isPending || folderDemoteMutation.isPending;
+  const isLoading = deleteMutation.isPending || changeRoleMutation.isPending || folderDeleteMutation.isPending || folderChangeRoleMutation.isPending;
 
   // Google Drive共有設定URLを生成
   const getShareUrl = (fileId: string) => {
     return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
   };
 
-  // Check if permission can be modified (not owner)
+  // Check if permission can be modified (not owner and user has permission)
   const canModifyPermission = (perm: ScannedFile['permissions'][0]) => {
-    return perm.role !== 'owner' && file.isInternalOwner;
+    return perm.role !== 'owner' && canModifyFilePermission(file);
   };
 
-  // Check if permission can be demoted (only writers can be demoted)
-  const canDemotePermission = (perm: ScannedFile['permissions'][0]) => {
-    return ['writer', 'organizer', 'fileOrganizer'].includes(perm.role);
+  // Get current role normalized (convert organizer/fileOrganizer to writer for display)
+  const getNormalizedRole = (perm: ScannedFile['permissions'][0]): 'reader' | 'commenter' | 'writer' | 'owner' => {
+    if (['writer', 'organizer', 'fileOrganizer'].includes(perm.role)) return 'writer';
+    if (perm.role === 'commenter') return 'commenter';
+    if (perm.role === 'owner') return 'owner';
+    return 'reader';
+  };
+
+  const roleLabels: Record<string, string> = {
+    reader: '閲覧者',
+    commenter: 'コメント可',
+    writer: '編集者',
   };
 
   // Get permission label for confirmation dialog
@@ -311,9 +342,12 @@ function FileDetailModal({
                     href={`https://drive.google.com/drive/folders/${selectedFolder.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#1a73e8] hover:underline text-sm"
+                    className="inline-flex items-center gap-1 text-[#1a73e8] hover:underline text-sm"
                   >
                     開く
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                    </svg>
                   </a>
                   {onNavigateToFolder && (
                     <button
@@ -376,28 +410,32 @@ function FileDetailModal({
                           : '閲覧者'}
                       </span>
                       {/* Folder Permission Action Buttons */}
-                      {perm.role !== 'owner' && file.isInternalOwner && (
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                          {['writer', 'organizer', 'fileOrganizer'].includes(perm.role) && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
+                      {perm.role !== 'owner' && canModifyFolderPermission(selectedFolder.permissions) && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {/* Folder Role selector dropdown */}
+                          <select
+                            value={getNormalizedRole(perm)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newRole = e.target.value as 'reader' | 'commenter' | 'writer';
+                              if (newRole !== getNormalizedRole(perm)) {
                                 setConfirmDialog({
-                                  type: 'demote',
+                                  type: 'changeRole',
                                   permissionId: perm.id,
                                   permissionLabel: getPermissionLabel(perm),
+                                  newRole,
                                   folderId: selectedFolder.id,
                                 });
-                              }}
-                              disabled={isLoading}
-                              className="p-1 text-[#5f6368] hover:bg-[#e8eaed] rounded transition-colors disabled:opacity-50"
-                              title="閲覧者に変更"
-                            >
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 4c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8m0-2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-6h3l-4-4-4 4h3v6z" />
-                              </svg>
-                            </button>
-                          )}
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={isLoading}
+                            className="text-xs px-1.5 py-0.5 border border-[#dadce0] rounded bg-white text-[#202124] hover:border-[#1a73e8] focus:border-[#1a73e8] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <option value="reader">閲覧者</option>
+                            <option value="commenter">コメント可</option>
+                            <option value="writer">編集者</option>
+                          </select>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -527,23 +565,28 @@ function FileDetailModal({
                   </div>
                   {/* Permission Action Buttons */}
                   {canModifyPermission(perm) && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {canDemotePermission(perm) && (
-                        <button
-                          onClick={() => setConfirmDialog({
-                            type: 'demote',
-                            permissionId: perm.id,
-                            permissionLabel: getPermissionLabel(perm),
-                          })}
-                          disabled={isLoading}
-                          className="p-1.5 text-[#5f6368] hover:bg-[#e8eaed] rounded transition-colors disabled:opacity-50"
-                          title="閲覧者に変更"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 4c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8m0-2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-6h3l-4-4-4 4h3v6z" />
-                          </svg>
-                        </button>
-                      )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Role selector dropdown */}
+                      <select
+                        value={getNormalizedRole(perm)}
+                        onChange={(e) => {
+                          const newRole = e.target.value as 'reader' | 'commenter' | 'writer';
+                          if (newRole !== getNormalizedRole(perm)) {
+                            setConfirmDialog({
+                              type: 'changeRole',
+                              permissionId: perm.id,
+                              permissionLabel: getPermissionLabel(perm),
+                              newRole,
+                            });
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="text-xs px-2 py-1 border border-[#dadce0] rounded bg-white text-[#202124] hover:border-[#1a73e8] focus:border-[#1a73e8] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="reader">閲覧者</option>
+                        <option value="commenter">コメント可</option>
+                        <option value="writer">編集者</option>
+                      </select>
                       <button
                         onClick={() => setConfirmDialog({
                           type: 'delete',
@@ -581,9 +624,9 @@ function FileDetailModal({
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-[#1a73e8] rounded-md hover:bg-[#1557b0] transition-colors text-center inline-flex items-center justify-center gap-2"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+              <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
             </svg>
-            共有設定を開く
+            Google Driveで開く
           </a>
         </div>
       </div>
@@ -595,17 +638,21 @@ function FileDetailModal({
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] bg-white rounded-xl shadow-xl z-[60] p-6">
             <h3 className="text-lg font-medium text-[#202124] mb-2">
               {confirmDialog.folderId
-                ? (confirmDialog.type === 'delete' ? 'フォルダのアクセス権を削除しますか？' : 'フォルダ権限を閲覧者に変更しますか？')
-                : (confirmDialog.type === 'delete' ? 'アクセス権を削除しますか？' : '閲覧者に変更しますか？')}
+                ? (confirmDialog.type === 'delete'
+                    ? 'フォルダのアクセス権を削除しますか？'
+                    : `フォルダ権限を${confirmDialog.newRole ? roleLabels[confirmDialog.newRole] : ''}に変更しますか？`)
+                : (confirmDialog.type === 'delete'
+                    ? 'アクセス権を削除しますか？'
+                    : `権限を${confirmDialog.newRole ? roleLabels[confirmDialog.newRole] : ''}に変更しますか？`)}
             </h3>
             <p className="text-sm text-[#5f6368] mb-6">
               {confirmDialog.folderId
                 ? (confirmDialog.type === 'delete'
                   ? `フォルダの「${confirmDialog.permissionLabel}」のアクセス権を削除します。フォルダ内の全ファイルに影響します。この操作は取り消せません。`
-                  : `フォルダの「${confirmDialog.permissionLabel}」を閲覧者に変更します。フォルダ内の全ファイルに影響します。`)
+                  : `フォルダの「${confirmDialog.permissionLabel}」を${confirmDialog.newRole ? roleLabels[confirmDialog.newRole] : ''}に変更します。フォルダ内の全ファイルに影響します。`)
                 : (confirmDialog.type === 'delete'
                   ? `「${confirmDialog.permissionLabel}」のアクセス権を削除します。この操作は取り消せません。`
-                  : `「${confirmDialog.permissionLabel}」を閲覧者に変更します。`)}
+                  : `「${confirmDialog.permissionLabel}」を${confirmDialog.newRole ? roleLabels[confirmDialog.newRole] : ''}に変更します。`)}
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -733,6 +780,7 @@ function FolderCard({
   onFileClick,
   scanId,
   onNavigateToFolder,
+  onShareClick,
 }: {
   folder: FolderSummary;
   isExpanded: boolean;
@@ -740,6 +788,7 @@ function FolderCard({
   onFileClick: (file: ScannedFile) => void;
   scanId: string;
   onNavigateToFolder?: (folderId: string) => void;
+  onShareClick?: (folderId: string) => void;
 }) {
   const config = RISK_LEVEL_CONFIG[folder.highestRiskLevel];
 
@@ -816,6 +865,22 @@ function FolderCard({
           {config.label}
         </div>
 
+        {/* Share Settings Button */}
+        {onShareClick && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onShareClick(folder.id);
+            }}
+            className="p-2 text-[#5f6368] hover:bg-[#f1f3f4] rounded-lg transition-colors"
+            title="共有設定"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+            </svg>
+          </button>
+        )}
+
         {/* Expand Icon */}
         <svg
           className={`w-5 h-5 text-[#5f6368] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -849,10 +914,13 @@ function FolderCard({
                             href={`https://drive.google.com/drive/folders/${pathFolder.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:text-[#1a73e8] hover:underline"
+                            className="inline-flex items-center gap-0.5 hover:text-[#1a73e8] hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {pathFolder.name}
+                            <svg className="w-2.5 h-2.5 opacity-50" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                            </svg>
                           </a>
                           {onNavigateToFolder && (
                             <button
@@ -977,6 +1045,303 @@ function FolderCard({
   );
 }
 
+// Folder Permissions Modal Component
+function FolderPermissionsModal({
+  folder,
+  onClose,
+  scanId,
+  onPermissionChange,
+}: {
+  folder: FolderPathItem;
+  onClose: () => void;
+  scanId: string;
+  onPermissionChange?: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    type: 'delete' | 'changeRole';
+    permissionId: string;
+    permissionLabel: string;
+    newRole?: 'reader' | 'commenter' | 'writer';
+  } | null>(null);
+  const [operationResult, setOperationResult] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  // Check if user can modify folder permissions
+  const canModifyFolderPermission = () => {
+    if (!user) return false;
+    if (user.role === 'admin' || user.role === 'owner') return true;
+    const ownerPerm = folder.permissions.find(p => p.role === 'owner');
+    return ownerPerm?.emailAddress === user.email;
+  };
+
+  // Folder permission delete mutation
+  const folderDeleteMutation = useMutation({
+    mutationFn: ({ permissionId }: { permissionId: string }) =>
+      scanApi.deleteFolderPermission(scanId, folder.id, permissionId),
+    onSuccess: () => {
+      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました' });
+      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      onPermissionChange?.();
+      setTimeout(() => setOperationResult(null), 3000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の削除に失敗しました' });
+    },
+  });
+
+  // Folder permission role change mutation
+  const folderChangeRoleMutation = useMutation({
+    mutationFn: ({ permissionId, role }: { permissionId: string; role: 'reader' | 'commenter' | 'writer' }) =>
+      scanApi.updateFolderPermissionRole(scanId, folder.id, permissionId, role),
+    onSuccess: (_, variables) => {
+      const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
+      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました` });
+      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      onPermissionChange?.();
+      setTimeout(() => setOperationResult(null), 3000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の変更に失敗しました' });
+    },
+  });
+
+  const handleConfirm = () => {
+    if (!confirmDialog) return;
+    if (confirmDialog.type === 'delete') {
+      folderDeleteMutation.mutate({ permissionId: confirmDialog.permissionId });
+    } else if (confirmDialog.type === 'changeRole' && confirmDialog.newRole) {
+      folderChangeRoleMutation.mutate({ permissionId: confirmDialog.permissionId, role: confirmDialog.newRole });
+    }
+    setConfirmDialog(null);
+  };
+
+  const isLoading = folderDeleteMutation.isPending || folderChangeRoleMutation.isPending;
+
+  // Get normalized role for display
+  const getNormalizedRole = (perm: FolderPathItem['permissions'][0]): 'reader' | 'commenter' | 'writer' | 'owner' => {
+    if (['writer', 'organizer', 'fileOrganizer'].includes(perm.role)) return 'writer';
+    if (perm.role === 'commenter') return 'commenter';
+    if (perm.role === 'owner') return 'owner';
+    return 'reader';
+  };
+
+  const roleLabels: Record<string, string> = {
+    reader: '閲覧者',
+    commenter: 'コメント可',
+    writer: '編集者',
+  };
+
+  // Get permission label for display
+  const getPermissionLabel = (perm: FolderPathItem['permissions'][0]) => {
+    if (perm.type === 'anyone') return 'リンクを知っている全員';
+    if (perm.type === 'domain') return `${perm.domain} のすべてのユーザー`;
+    return perm.displayName || perm.emailAddress || 'ユーザー';
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[500px] md:max-h-[70vh] bg-white rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#dadce0]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#f1f3f4] rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-medium text-[#202124] line-clamp-1">{folder.name}</h2>
+              <p className="text-sm text-[#5f6368]">フォルダの共有設定</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-[#f1f3f4] transition-colors"
+          >
+            <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Operation Result Toast */}
+        {operationResult && (
+          <div className={`mx-6 mt-4 p-3 rounded-lg flex items-center gap-2 ${
+            operationResult.type === 'success' ? 'bg-[#e6f4ea] text-[#137333]' : 'bg-[#fce8e6] text-[#c5221f]'
+          }`}>
+            {operationResult.type === 'success' ? (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+              </svg>
+            )}
+            <span className="text-sm">{operationResult.message}</span>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Google Drive Link */}
+          <div className="mb-4">
+            <a
+              href={`https://drive.google.com/drive/folders/${folder.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-[#1a73e8] hover:underline"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+              </svg>
+              Google Driveで開く
+            </a>
+          </div>
+
+          {/* Permissions List */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-[#202124] mb-3">アクセス権限 ({folder.permissions.length}件)</h3>
+            {folder.permissions.length === 0 ? (
+              <p className="text-sm text-[#5f6368]">権限情報がありません</p>
+            ) : (
+              folder.permissions.map((perm) => (
+                <div key={perm.id} className="flex items-center gap-3 p-3 bg-[#f8f9fa] rounded-lg">
+                  {/* Permission Icon */}
+                  <div className="w-8 h-8 rounded-full bg-[#dadce0] flex items-center justify-center flex-shrink-0">
+                    {perm.type === 'anyone' ? (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                      </svg>
+                    ) : perm.type === 'domain' ? (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Permission Label */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#202124] truncate">
+                      {getPermissionLabel(perm)}
+                    </p>
+                    {perm.emailAddress && perm.type !== 'anyone' && perm.type !== 'domain' && (
+                      <p className="text-xs text-[#5f6368] truncate">{perm.emailAddress}</p>
+                    )}
+                  </div>
+
+                  {/* Role and Actions */}
+                  {perm.role === 'owner' ? (
+                    <span className="text-sm text-[#5f6368] px-2 py-1 bg-[#e8eaed] rounded">
+                      オーナー
+                    </span>
+                  ) : canModifyFolderPermission() ? (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Role Dropdown */}
+                      <select
+                        value={getNormalizedRole(perm)}
+                        onChange={(e) => {
+                          const newRole = e.target.value as 'reader' | 'commenter' | 'writer';
+                          if (newRole !== getNormalizedRole(perm)) {
+                            setConfirmDialog({
+                              type: 'changeRole',
+                              permissionId: perm.id,
+                              permissionLabel: getPermissionLabel(perm),
+                              newRole,
+                            });
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="text-sm border border-[#dadce0] rounded-md px-2 py-1 bg-white hover:bg-[#f8f9fa] cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="reader">閲覧者</option>
+                        <option value="commenter">コメント可</option>
+                        <option value="writer">編集者</option>
+                      </select>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => setConfirmDialog({
+                          type: 'delete',
+                          permissionId: perm.id,
+                          permissionLabel: getPermissionLabel(perm),
+                        })}
+                        disabled={isLoading}
+                        className="p-1.5 text-[#c5221f] hover:bg-[#fce8e6] rounded transition-colors disabled:opacity-50"
+                        title="権限を削除"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-[#5f6368]">
+                      {getNormalizedRole(perm) === 'writer' ? '編集者' :
+                       getNormalizedRole(perm) === 'commenter' ? 'コメント可' : '閲覧者'}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-[60]" onClick={() => setConfirmDialog(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] bg-white rounded-xl shadow-xl z-[60] p-6">
+            <h3 className="text-lg font-medium text-[#202124] mb-2">
+              {confirmDialog.type === 'delete' ? '権限の削除' : '権限の変更'}
+            </h3>
+            <p className="text-sm text-[#5f6368] mb-6">
+              {confirmDialog.type === 'delete'
+                ? `「${confirmDialog.permissionLabel}」のアクセス権限を削除しますか？`
+                : `「${confirmDialog.permissionLabel}」の権限を「${roleLabels[confirmDialog.newRole!]}」に変更しますか？`
+              }
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-sm font-medium text-[#5f6368] border border-[#dadce0] rounded-md hover:bg-[#f8f9fa] transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={isLoading}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors disabled:opacity-50 ${
+                  confirmDialog.type === 'delete'
+                    ? 'bg-[#c5221f] hover:bg-[#a31a15]'
+                    : 'bg-[#1a73e8] hover:bg-[#1557b0]'
+                }`}
+              >
+                {isLoading ? '処理中...' : confirmDialog.type === 'delete' ? '削除' : '変更'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export function FilesPage() {
   const { scanId: paramScanId } = useParams<{ scanId: string }>();
   const [searchParams] = useSearchParams();
@@ -1000,7 +1365,19 @@ export function FilesPage() {
   const [offset, setOffset] = useState(0);
   const [folderOffset, setFolderOffset] = useState(0);
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
+  const [folderPermissionsPanel, setFolderPermissionsPanel] = useState<FolderPathItem | null>(null);
   const limit = 20;
+
+  // Handler for opening folder permissions panel
+  const handleFolderShareClick = async (folderId: string) => {
+    if (!scanId) return;
+    try {
+      const result = await scanApi.getFolderPermissions(scanId, folderId);
+      setFolderPermissionsPanel(result.folder);
+    } catch (error) {
+      console.error('Failed to fetch folder permissions:', error);
+    }
+  };
 
   // Debounce search input
   useEffect(() => {
@@ -1700,13 +2077,6 @@ export function FilesPage() {
                   </>
                 )}
               </div>
-            ) : folders.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
-                <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-                </svg>
-                <p className="mt-2 text-sm text-[#5f6368]">該当するフォルダがありません</p>
-              </div>
             ) : (
               <div className="space-y-4">
                 {/* Target folder from navigation (not in current page) */}
@@ -1723,6 +2093,7 @@ export function FilesPage() {
                       onFileClick={setSelectedFile}
                       scanId={scanId!}
                       onNavigateToFolder={setExpandedFolderId}
+                      onShareClick={handleFolderShareClick}
                     />
                   </div>
                 )}
@@ -1731,19 +2102,29 @@ export function FilesPage() {
                     <div className="h-6 bg-[#e8eaed] rounded w-1/3"></div>
                   </div>
                 )}
-                {folders.map((folder) => (
-                  <FolderCard
-                    key={folder.id}
-                    folder={folder}
-                    isExpanded={expandedFolderId === folder.id}
-                    onToggle={() => setExpandedFolderId(
-                      expandedFolderId === folder.id ? null : folder.id
-                    )}
-                    onFileClick={setSelectedFile}
-                    scanId={scanId!}
-                    onNavigateToFolder={setExpandedFolderId}
-                  />
-                ))}
+                {folders.length === 0 && !targetFolderData?.folder && !isTargetFolderLoading ? (
+                  <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
+                    <svg className="w-8 h-8 text-[#5f6368] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                    </svg>
+                    <p className="mt-2 text-sm text-[#5f6368]">該当するフォルダがありません</p>
+                  </div>
+                ) : (
+                  folders.map((folder) => (
+                    <FolderCard
+                      key={folder.id}
+                      folder={folder}
+                      isExpanded={expandedFolderId === folder.id}
+                      onToggle={() => setExpandedFolderId(
+                        expandedFolderId === folder.id ? null : folder.id
+                      )}
+                      onFileClick={setSelectedFile}
+                      scanId={scanId!}
+                      onNavigateToFolder={setExpandedFolderId}
+                      onShareClick={handleFolderShareClick}
+                    />
+                  ))
+                )}
               </div>
             )}
 
@@ -1787,6 +2168,16 @@ export function FilesPage() {
             setViewMode('folders');
             setExpandedFolderId(folderId);
           }}
+        />
+      )}
+
+      {/* Folder Permissions Modal */}
+      {folderPermissionsPanel && scanId && (
+        <FolderPermissionsModal
+          folder={folderPermissionsPanel}
+          onClose={() => setFolderPermissionsPanel(null)}
+          scanId={scanId}
+          onPermissionChange={() => setFolderPermissionsPanel(null)}
         />
       )}
 

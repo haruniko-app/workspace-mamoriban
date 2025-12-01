@@ -13,6 +13,7 @@ import {
   deletePermissionFromFolder,
   getFilePermissions,
   getFileFolderPath,
+  getFolderInfo,
   getStartPageToken,
   getChangedFileIds,
   type DriveFile,
@@ -25,6 +26,44 @@ const router = Router();
 
 // 認証必須
 router.use(requireAuth);
+
+/**
+ * ファイルの権限変更が可能かチェック
+ * admin/owner ロール、またはファイルオーナーなら可能
+ */
+function canModifyFilePermission(
+  user: { role: string; email: string },
+  scannedFile: ScannedFile | null
+): boolean {
+  // admin/owner は常に可能
+  if (user.role === 'admin' || user.role === 'owner') {
+    return true;
+  }
+  // ファイルオーナーは自分のファイルを変更可能
+  if (scannedFile && scannedFile.ownerEmail === user.email) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * フォルダの権限変更が可能かチェック
+ * admin/owner ロール、またはフォルダオーナーなら可能
+ */
+function canModifyFolderPermission(
+  user: { role: string; email: string },
+  folderOwnerEmail: string | null
+): boolean {
+  // admin/owner は常に可能
+  if (user.role === 'admin' || user.role === 'owner') {
+    return true;
+  }
+  // フォルダオーナーは自分のフォルダを変更可能
+  if (folderOwnerEmail && folderOwnerEmail === user.email) {
+    return true;
+  }
+  return false;
+}
 
 export interface FileWithRisk extends DriveFile {
   risk: RiskAssessment;
@@ -1073,18 +1112,28 @@ async function performIncrementalScan(
     }
 
     // ========================================
-    // Phase 6: フォルダサマリーを事前計算（Firestore再取得をスキップ）
+    // Phase 6: フォルダサマリーを処理
+    // 変更がない場合はベーススキャンからコピー、変更がある場合は再計算
     // ========================================
-    console.log(`Scan ${scanId}: Phase 6 - Calculating folder summaries...`);
-    // 全ファイルの親フォルダ情報を取得
-    const allParentFolderIds = allSavedFiles
-      .map((file) => file.parentFolderId)
-      .filter((id): id is string => !!id);
-    const allUniqueFolderIds = [...new Set(allParentFolderIds)];
-    const allFolderInfoMap = await getFolderInfoBatch(drive, allUniqueFolderIds);
+    let folderCount: number;
+    if (changedFileIds.size === 0 && removedFileIds.size === 0) {
+      // 変更がない場合：ベーススキャンからフォルダサマリをコピー（高速）
+      console.log(`Scan ${scanId}: Phase 6 - Copying folder summaries from base scan (no changes)...`);
+      folderCount = await ScannedFileService.copyFolderSummaries(baseScanId, scanId);
+      console.log(`Scan ${scanId}: Copied ${folderCount} folder summaries from base scan`);
+    } else {
+      // 変更がある場合：フォルダサマリを再計算
+      console.log(`Scan ${scanId}: Phase 6 - Calculating folder summaries (${changedFileIds.size} changes, ${removedFileIds.size} removals)...`);
+      // 全ファイルの親フォルダ情報を取得
+      const allParentFolderIds = allSavedFiles
+        .map((file) => file.parentFolderId)
+        .filter((id): id is string => !!id);
+      const allUniqueFolderIds = [...new Set(allParentFolderIds)];
+      const allFolderInfoMap = await getFolderInfoBatch(drive, allUniqueFolderIds);
 
-    const folderCount = await ScannedFileService.calculateAndSaveFolderSummaries(scanId, allFolderInfoMap, allSavedFiles);
-    console.log(`Scan ${scanId}: Calculated ${folderCount} folder summaries`);
+      folderCount = await ScannedFileService.calculateAndSaveFolderSummaries(scanId, allFolderInfoMap, allSavedFiles);
+      console.log(`Scan ${scanId}: Calculated ${folderCount} folder summaries`);
+    }
 
     // スキャン完了
     await ScanService.complete(scanId, {
@@ -1130,19 +1179,19 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
+    // スキャンファイル情報を取得
+    const scannedFile = await ScannedFileService.getById(scanId, fileId);
+    const targetPermission = scannedFile?.permissions.find(p => p.id === permissionId);
+
+    // admin/owner またはファイルオーナーのみ権限変更可能
+    if (!canModifyFilePermission(user, scannedFile)) {
+      return res.status(403).json({ error: '権限変更は管理者またはファイルオーナーのみ実行できます' });
     }
 
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
     }
-
-    // スキャンファイル情報を取得（ログ用）
-    const scannedFile = await ScannedFileService.getById(scanId, fileId);
-    const targetPermission = scannedFile?.permissions.find(p => p.id === permissionId);
 
     const drive = createDriveClient(req.session.accessToken);
     const result = await deletePermission(drive, fileId, permissionId);
@@ -1221,20 +1270,20 @@ router.put('/:scanId/files/:fileId/permissions/:permissionId', async (req: Reque
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
+    // スキャンファイル情報を取得
+    const scannedFile = await ScannedFileService.getById(scanId, fileId);
+    const targetPermission = scannedFile?.permissions.find(p => p.id === permissionId);
+    const oldRole = targetPermission?.role;
+
+    // admin/owner またはファイルオーナーのみ権限変更可能
+    if (!canModifyFilePermission(user, scannedFile)) {
+      return res.status(403).json({ error: '権限変更は管理者またはファイルオーナーのみ実行できます' });
     }
 
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
     }
-
-    // スキャンファイル情報を取得（ログ用）
-    const scannedFile = await ScannedFileService.getById(scanId, fileId);
-    const targetPermission = scannedFile?.permissions.find(p => p.id === permissionId);
-    const oldRole = targetPermission?.role;
 
     const drive = createDriveClient(req.session.accessToken);
     const result = await updatePermissionRole(drive, fileId, permissionId, role);
@@ -1370,6 +1419,45 @@ router.get('/:scanId/files/:fileId/folder-path', async (req: Request, res: Respo
   }
 });
 
+/**
+ * GET /api/scan/:scanId/folders/:folderId/permissions
+ * フォルダの権限情報を取得
+ */
+router.get('/:scanId/folders/:folderId/permissions', async (req: Request, res: Response) => {
+  const { scanId, folderId } = req.params;
+  const organization = req.organization!;
+
+  try {
+    // スキャンの存在確認と権限チェック
+    const scan = await ScanService.getById(scanId);
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+    if (scan.organizationId !== organization.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // アクセストークンの確認
+    if (!req.session.accessToken) {
+      return res.status(401).json({ error: 'Access token not available' });
+    }
+
+    const drive = createDriveClient(req.session.accessToken);
+    const folderInfo = await getFolderInfo(drive, folderId);
+
+    if (!folderInfo) {
+      return res.status(404).json({ error: 'Folder not found or access denied' });
+    }
+
+    res.json({
+      folder: folderInfo,
+    });
+  } catch (err) {
+    console.error('Get folder permissions error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ========================================
 // 一括操作API
 // ========================================
@@ -1412,11 +1500,6 @@ router.post('/:scanId/bulk/permissions/delete', async (req: Request, res: Respon
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
@@ -1430,6 +1513,12 @@ router.post('/:scanId/bulk/permissions/delete', async (req: Request, res: Respon
       const scannedFile = await ScannedFileService.getById(scanId, fileId);
       if (!scannedFile) {
         results.push({ fileId, fileName: fileId, success: false, error: 'ファイルが見つかりません' });
+        continue;
+      }
+
+      // admin/owner またはファイルオーナーのみ権限変更可能
+      if (!canModifyFilePermission(user, scannedFile)) {
+        results.push({ fileId, fileName: scannedFile.name, success: false, error: '権限変更は管理者またはファイルオーナーのみ実行できます' });
         continue;
       }
 
@@ -1545,11 +1634,6 @@ router.post('/:scanId/bulk/permissions/demote', async (req: Request, res: Respon
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
@@ -1563,6 +1647,12 @@ router.post('/:scanId/bulk/permissions/demote', async (req: Request, res: Respon
       const scannedFile = await ScannedFileService.getById(scanId, fileId);
       if (!scannedFile) {
         results.push({ fileId, fileName: fileId, success: false, error: 'ファイルが見つかりません' });
+        continue;
+      }
+
+      // admin/owner またはファイルオーナーのみ権限変更可能
+      if (!canModifyFilePermission(user, scannedFile)) {
+        results.push({ fileId, fileName: scannedFile.name, success: false, error: '権限変更は管理者またはファイルオーナーのみ実行できます' });
         continue;
       }
 
@@ -1676,11 +1766,6 @@ router.post('/:scanId/bulk/remove-public-access', async (req: Request, res: Resp
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
@@ -1694,6 +1779,12 @@ router.post('/:scanId/bulk/remove-public-access', async (req: Request, res: Resp
       const scannedFile = await ScannedFileService.getById(scanId, fileId);
       if (!scannedFile) {
         results.push({ fileId, fileName: fileId, success: false, error: 'ファイルが見つかりません' });
+        continue;
+      }
+
+      // admin/owner またはファイルオーナーのみ権限変更可能
+      if (!canModifyFilePermission(user, scannedFile)) {
+        results.push({ fileId, fileName: scannedFile.name, success: false, error: '権限変更は管理者またはファイルオーナーのみ実行できます' });
         continue;
       }
 
@@ -1794,17 +1885,27 @@ router.delete('/:scanId/folders/:folderId/permissions', async (req: Request, res
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
     }
 
     const drive = createDriveClient(req.session.accessToken);
+
+    // フォルダ情報を取得してオーナーを確認
+    let folderOwnerEmail: string | null = null;
+    try {
+      const folder = await drive.files.get({ fileId: folderId, fields: 'owners' });
+      folderOwnerEmail = folder.data.owners?.[0]?.emailAddress || null;
+    } catch {
+      // フォルダ情報取得に失敗してもエラーにはしない
+    }
+
+    // admin/owner またはフォルダオーナーのみ権限変更可能
+    if (!canModifyFolderPermission(user, folderOwnerEmail)) {
+      return res.status(403).json({ error: '権限変更は管理者またはフォルダオーナーのみ実行できます' });
+    }
+
     const result = await deletePermissionFromFolder(drive, folderId, email || '', type);
 
     // アクションログを記録
@@ -1864,11 +1965,6 @@ router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', asy
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
@@ -1876,13 +1972,20 @@ router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', asy
 
     const drive = createDriveClient(req.session.accessToken);
 
-    // フォルダ名を取得（ログ用）
+    // フォルダ名とオーナーを取得
     let folderName = folderId;
+    let folderOwnerEmail: string | null = null;
     try {
-      const folder = await drive.files.get({ fileId: folderId, fields: 'name' });
+      const folder = await drive.files.get({ fileId: folderId, fields: 'name,owners' });
       folderName = folder.data.name || folderId;
+      folderOwnerEmail = folder.data.owners?.[0]?.emailAddress || null;
     } catch {
-      // フォルダ名取得に失敗してもエラーにはしない
+      // フォルダ情報取得に失敗してもエラーにはしない
+    }
+
+    // admin/owner またはフォルダオーナーのみ権限変更可能
+    if (!canModifyFolderPermission(user, folderOwnerEmail)) {
+      return res.status(403).json({ error: '権限変更は管理者またはフォルダオーナーのみ実行できます' });
     }
 
     // フォルダの権限を削除（フォルダもファイルと同じDrive APIを使用）
@@ -1946,11 +2049,6 @@ router.put('/:scanId/folders/:folderId/folder-permissions/:permissionId', async 
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // admin/ownerのみ権限変更可能
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      return res.status(403).json({ error: '権限変更は管理者のみ実行できます' });
-    }
-
     // アクセストークンの確認
     if (!req.session.accessToken) {
       return res.status(401).json({ error: 'Access token not available' });
@@ -1958,13 +2056,20 @@ router.put('/:scanId/folders/:folderId/folder-permissions/:permissionId', async 
 
     const drive = createDriveClient(req.session.accessToken);
 
-    // フォルダ名を取得（ログ用）
+    // フォルダ名とオーナーを取得
     let folderName = folderId;
+    let folderOwnerEmail: string | null = null;
     try {
-      const folder = await drive.files.get({ fileId: folderId, fields: 'name' });
+      const folder = await drive.files.get({ fileId: folderId, fields: 'name,owners' });
       folderName = folder.data.name || folderId;
+      folderOwnerEmail = folder.data.owners?.[0]?.emailAddress || null;
     } catch {
-      // フォルダ名取得に失敗してもエラーにはしない
+      // フォルダ情報取得に失敗してもエラーにはしない
+    }
+
+    // admin/owner またはフォルダオーナーのみ権限変更可能
+    if (!canModifyFolderPermission(user, folderOwnerEmail)) {
+      return res.status(403).json({ error: '権限変更は管理者またはフォルダオーナーのみ実行できます' });
     }
 
     // フォルダの権限を更新

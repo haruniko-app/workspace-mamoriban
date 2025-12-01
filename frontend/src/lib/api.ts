@@ -192,6 +192,10 @@ export const scanApi = {
     api.get<{ fileId: string; folderPath: FolderPathItem[] }>(
       `/api/scan/${scanId}/files/${fileId}/folder-path`
     ),
+  getFolderPermissions: (scanId: string, folderId: string) =>
+    api.get<{ folder: FolderPathItem }>(
+      `/api/scan/${scanId}/folders/${folderId}/permissions`
+    ),
   // Folder permission management
   deleteFolderPermission: (scanId: string, folderId: string, permissionId: string) =>
     api.delete<{ success: boolean; message: string; folderId: string; permissionId: string }>(

@@ -137,6 +137,7 @@ export function DashboardPage() {
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
   const [showFailed, setShowFailed] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
   const [cancellingScanId, setCancellingScanId] = useState<string | null>(null);
   const limit = 5;
 
@@ -171,10 +172,11 @@ export function DashboardPage() {
 
   // Filter and paginate scans
   const filteredScans = historyData?.scans.filter(
-    (scan) => showFailed || scan.status !== 'failed'
+    (scan) => (showFailed || scan.status !== 'failed') && (showCancelled || scan.status !== 'cancelled')
   ) || [];
   const displayedScans = filteredScans.slice(0, limit);
   const failedCount = (historyData?.scans.filter((s) => s.status === 'failed') || []).length;
+  const cancelledCount = (historyData?.scans.filter((s) => s.status === 'cancelled') || []).length;
 
   const latestScan = historyData?.scans.find((s) => s.status === 'completed');
   const pagination = historyData?.pagination;
@@ -377,6 +379,22 @@ export function DashboardPage() {
                   className="text-xs px-2 py-1 rounded-full bg-[#fce8e6] text-[#c5221f] hover:bg-[#f8d7da] transition-colors"
                 >
                   失敗を非表示
+                </button>
+              )}
+              {cancelledCount > 0 && !showCancelled && (
+                <button
+                  onClick={() => setShowCancelled(true)}
+                  className="text-xs px-2 py-1 rounded-full bg-[#f1f3f4] text-[#5f6368] hover:bg-[#e8eaed] transition-colors"
+                >
+                  +{cancelledCount}件のキャンセルを表示
+                </button>
+              )}
+              {showCancelled && cancelledCount > 0 && (
+                <button
+                  onClick={() => setShowCancelled(false)}
+                  className="text-xs px-2 py-1 rounded-full bg-[#fef7e0] text-[#b06000] hover:bg-[#fdf0c8] transition-colors"
+                >
+                  キャンセルを非表示
                 </button>
               )}
             </div>
