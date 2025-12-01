@@ -332,7 +332,7 @@ export async function* scanAllFiles(
 
 /**
  * フォルダ名を一括取得（キャッシュ付き）
- * 並列度を20に設定してAPI呼び出しを高速化
+ * 並列度を50に設定してAPI呼び出しを高速化
  */
 export async function getFolderNames(
   drive: drive_v3.Drive,
@@ -345,10 +345,10 @@ export async function getFolderNames(
     return result;
   }
 
-  // 並列で取得（APIレート制限を考慮して20件ずつ - 10→20に最適化）
-  const BATCH_SIZE = 20;
-  for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
-    const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+  // 並列で取得（APIレート制限を考慮して50件ずつ）
+  const CONCURRENCY = 50;
+  for (let i = 0; i < uniqueIds.length; i += CONCURRENCY) {
+    const batch = uniqueIds.slice(i, i + CONCURRENCY);
     const promises = batch.map(async (folderId) => {
       try {
         const response = await drive.files.get({
@@ -358,7 +358,6 @@ export async function getFolderNames(
         return { id: folderId, name: response.data.name || '' };
       } catch (error) {
         // フォルダにアクセスできない場合（権限なし、削除済み等）
-        console.warn(`Failed to get folder name for ${folderId}:`, error);
         return { id: folderId, name: '' };
       }
     });
@@ -380,7 +379,7 @@ export interface FolderBasicInfo {
 
 /**
  * フォルダの詳細情報を一括取得（名前と親フォルダID）
- * 並列度を20に設定してAPI呼び出しを高速化
+ * 並列度を50に設定してAPI呼び出しを高速化
  */
 export async function getFolderInfoBatch(
   drive: drive_v3.Drive,
@@ -393,10 +392,10 @@ export async function getFolderInfoBatch(
     return result;
   }
 
-  // 並列で取得（APIレート制限を考慮して20件ずつ - 10→20に最適化）
-  const BATCH_SIZE = 20;
-  for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
-    const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+  // 並列で取得（APIレート制限を考慮して50件ずつ）
+  const CONCURRENCY = 50;
+  for (let i = 0; i < uniqueIds.length; i += CONCURRENCY) {
+    const batch = uniqueIds.slice(i, i + CONCURRENCY);
     const promises = batch.map(async (folderId) => {
       try {
         const response = await drive.files.get({
@@ -410,7 +409,6 @@ export async function getFolderInfoBatch(
         };
       } catch (error) {
         // フォルダにアクセスできない場合（権限なし、削除済み等）
-        console.warn(`Failed to get folder info for ${folderId}:`, error);
         return { id: folderId, name: '', parentFolderId: null };
       }
     });
@@ -479,6 +477,65 @@ export async function updatePermissionRole(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error(`Failed to update permission ${permissionId} on file ${fileId}:`, error);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * 権限を復元（再追加）
+ */
+export async function restorePermission(
+  drive: drive_v3.Drive,
+  fileId: string,
+  permission: {
+    type: 'user' | 'group' | 'domain' | 'anyone';
+    role: 'reader' | 'commenter' | 'writer';
+    emailAddress?: string | null;
+    domain?: string | null;
+  }
+): Promise<{ success: boolean; permission?: DrivePermission; error?: string }> {
+  try {
+    const requestBody: drive_v3.Schema$Permission = {
+      type: permission.type,
+      role: permission.role,
+    };
+
+    // タイプに応じて追加のフィールドを設定
+    if (permission.type === 'user' || permission.type === 'group') {
+      if (!permission.emailAddress) {
+        return { success: false, error: 'メールアドレスが必要です' };
+      }
+      requestBody.emailAddress = permission.emailAddress;
+    } else if (permission.type === 'domain') {
+      if (!permission.domain) {
+        return { success: false, error: 'ドメインが必要です' };
+      }
+      requestBody.domain = permission.domain;
+    }
+    // anyone タイプは追加フィールド不要
+
+    const response = await drive.permissions.create({
+      fileId,
+      requestBody,
+      fields: 'id,type,role,emailAddress,domain,displayName',
+      sendNotificationEmail: false, // 通知メールを送らない
+    });
+
+    const perm = response.data;
+    return {
+      success: true,
+      permission: {
+        id: perm.id || '',
+        type: perm.type as DrivePermission['type'],
+        role: perm.role as DrivePermission['role'],
+        emailAddress: perm.emailAddress || null,
+        domain: perm.domain || null,
+        displayName: perm.displayName || null,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Failed to restore permission on file ${fileId}:`, error);
     return { success: false, error: message };
   }
 }

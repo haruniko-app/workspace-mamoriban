@@ -10,6 +10,7 @@ import {
   getFolderInfoBatch,
   deletePermission,
   updatePermissionRole,
+  restorePermission,
   deletePermissionFromFolder,
   getFilePermissions,
   getFileFolderPath,
@@ -842,7 +843,7 @@ async function performScan(
 
     // ファイルをFirestoreに保存（並列バッチで保存）+ Phase 5用にデータを収集
     const BATCH_SIZE = 500; // Firestoreのバッチ上限
-    const CONCURRENT_BATCHES = 5; // 同時実行バッチ数（Firestoreレート制限を考慮）
+    const CONCURRENT_BATCHES = 10; // 同時実行バッチ数（5→10に最適化）
     const allSavedFiles: Omit<ScannedFile, 'scanId' | 'createdAt'>[] = [];
 
     // 全バッチデータを事前に作成
@@ -984,7 +985,7 @@ async function performIncrementalScan(
 
     // 未変更ファイルを並列バッチ保存
     const BATCH_SIZE = 500;
-    const CONCURRENT_BATCHES = 5; // 同時実行バッチ数
+    const CONCURRENT_BATCHES = 10; // 同時実行バッチ数（5→10に最適化）
     const unchangedBatches: Omit<ScannedFile, 'scanId' | 'createdAt'>[][] = [];
     for (let i = 0; i < unchangedFiles.length; i += BATCH_SIZE) {
       unchangedBatches.push(unchangedFiles.slice(i, i + BATCH_SIZE));
@@ -1194,7 +1195,45 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
     }
 
     const drive = createDriveClient(req.session.accessToken);
-    const result = await deletePermission(drive, fileId, permissionId);
+
+    // Drive APIから現在の権限リストを取得して、実際のpermissionIdを特定
+    const currentPermissions = await getFilePermissions(drive, fileId);
+    let actualPermissionId = permissionId;
+
+    // permissionIdがanyoneWithLinkなど特殊なIDの場合、実際のIDを探す
+    let permissionAlreadyDeleted = false;
+    if (permissionId === 'anyoneWithLink' || permissionId === 'anyone') {
+      const matchingPerm = currentPermissions.find(p => p.type === 'anyone');
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      } else {
+        // 権限が見つからない場合、既に削除済みとみなしてFirestoreのみ更新
+        console.log(`Permission ${permissionId} not found in current permissions, already deleted`);
+        permissionAlreadyDeleted = true;
+      }
+    } else if (targetPermission) {
+      // スキャンデータの権限情報と照合して、実際のIDを特定
+      const matchingPerm = currentPermissions.find(p => {
+        // type が一致し、かつ識別子（email/domain/anyone）が一致するものを探す
+        if (p.type !== targetPermission.type) return false;
+        if (targetPermission.type === 'anyone') return p.type === 'anyone';
+        if (targetPermission.type === 'domain') return p.domain === targetPermission.domain;
+        if (targetPermission.emailAddress) return p.emailAddress === targetPermission.emailAddress;
+        return false;
+      });
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      } else {
+        // 権限が見つからない場合、既に削除済みとみなす
+        console.log(`Permission ${permissionId} not found in current permissions, already deleted`);
+        permissionAlreadyDeleted = true;
+      }
+    }
+
+    // 既に削除済みの場合はDrive API呼び出しをスキップ
+    const result = permissionAlreadyDeleted
+      ? { success: true }
+      : await deletePermission(drive, fileId, actualPermissionId);
 
     // アクションログを記録
     await ActionLogService.logPermissionChange({
@@ -1212,16 +1251,18 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
         oldRole: targetPermission?.role,
       },
       success: result.success,
-      errorMessage: result.error,
+      errorMessage: result.error || null,
     });
 
     if (!result.success) {
       return res.status(400).json({ error: result.error || '権限の削除に失敗しました' });
     }
 
-    // Firestoreのスキャンデータを更新（権限を削除）
+    // Firestoreのスキャンデータを更新（権限を削除済みとしてマーク）
     if (scannedFile) {
-      const updatedPermissions = scannedFile.permissions.filter(p => p.id !== permissionId);
+      const updatedPermissions = scannedFile.permissions.map(p =>
+        p.id === permissionId ? { ...p, deleted: true, deletedAt: new Date() } : p
+      );
       await ScannedFileService.updatePermissions(scanId, fileId, updatedPermissions);
     }
 
@@ -1230,6 +1271,7 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
       message: '権限を削除しました',
       fileId,
       permissionId,
+      deleted: true,
     });
   } catch (err) {
     console.error('Delete permission error:', err);
@@ -1240,6 +1282,137 @@ router.delete('/:scanId/files/:fileId/permissions/:permissionId', async (req: Re
       errorMessage: err instanceof Error ? err.message : 'Unknown error',
       errorStack: err instanceof Error ? err.stack : undefined,
     });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/scan/:scanId/files/:fileId/permissions/restore
+ * 削除した権限を復元
+ */
+router.post('/:scanId/files/:fileId/permissions/restore', async (req: Request, res: Response) => {
+  console.log('=== File restore endpoint called ===');
+  console.log('Request params:', req.params);
+  console.log('Request body:', req.body);
+
+  const { scanId, fileId } = req.params;
+  const { type, role, emailAddress, domain, displayName } = req.body;
+  const organization = req.organization!;
+  const user = req.user!;
+
+  // タイプとロールのバリデーション
+  const validTypes = ['user', 'group', 'domain', 'anyone'];
+  const validRoles = ['reader', 'commenter', 'writer'];
+  if (!type || !validTypes.includes(type)) {
+    return res.status(400).json({ error: '有効なタイプを指定してください: user, group, domain, anyone' });
+  }
+  if (!role || !validRoles.includes(role)) {
+    return res.status(400).json({ error: '有効なロールを指定してください: reader, commenter, writer' });
+  }
+
+  try {
+    // スキャンの存在確認と権限チェック
+    const scan = await ScanService.getById(scanId);
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+    if (scan.organizationId !== organization.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // スキャンファイル情報を取得
+    const scannedFile = await ScannedFileService.getById(scanId, fileId);
+
+    // admin/owner またはファイルオーナーのみ権限変更可能
+    if (!canModifyFilePermission(user, scannedFile)) {
+      return res.status(403).json({ error: '権限復元は管理者またはファイルオーナーのみ実行できます' });
+    }
+
+    // アクセストークンの確認
+    if (!req.session.accessToken) {
+      return res.status(401).json({ error: 'Access token not available' });
+    }
+
+    const drive = createDriveClient(req.session.accessToken);
+
+    // 権限を復元
+    const result = await restorePermission(drive, fileId, {
+      type,
+      role,
+      emailAddress,
+      domain,
+    });
+
+    // アクションログを記録
+    await ActionLogService.logPermissionChange({
+      organizationId: organization.id,
+      userId: user.id,
+      userEmail: user.email,
+      actionType: 'permission_restore',
+      targetType: 'file',
+      targetId: fileId,
+      targetName: scannedFile?.name || fileId,
+      details: {
+        permissionId: result.permission?.id,
+        targetEmail: emailAddress || domain || undefined,
+        targetType: type,
+        newRole: role,
+      },
+      success: result.success,
+      errorMessage: result.error || null,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || '権限の復元に失敗しました' });
+    }
+
+    // Firestoreのスキャンデータを更新（削除済み権限を復元）
+    if (scannedFile && result.permission) {
+      // 削除済み権限を探す（type + email/domain でマッチング）
+      const deletedPermIndex = scannedFile.permissions.findIndex(p => {
+        if (!p.deleted) return false;
+        if (p.type !== result.permission!.type) return false;
+        if (p.type === 'anyone') return true;
+        if (p.type === 'domain') return p.domain === result.permission!.domain;
+        return p.emailAddress === result.permission!.emailAddress;
+      });
+
+      let updatedPermissions;
+      if (deletedPermIndex >= 0) {
+        // 削除済み権限を更新（新しいIDで復元）
+        updatedPermissions = scannedFile.permissions.map((p, i) => {
+          if (i !== deletedPermIndex) return p;
+          // deleted関連フィールドを除去して復元
+          const { deleted, deletedAt, ...rest } = p;
+          return {
+            ...rest,
+            id: result.permission!.id,
+            role: result.permission!.role,
+          };
+        });
+      } else {
+        // 見つからない場合は新規追加
+        const newPermission = {
+          id: result.permission.id,
+          type: result.permission.type,
+          role: result.permission.role,
+          emailAddress: result.permission.emailAddress || null,
+          domain: result.permission.domain || null,
+          displayName: result.permission.displayName || null,
+        };
+        updatedPermissions = [...scannedFile.permissions, newPermission];
+      }
+      await ScannedFileService.updatePermissions(scanId, fileId, updatedPermissions);
+    }
+
+    res.json({
+      success: true,
+      message: '権限を復元しました',
+      fileId,
+      permission: result.permission,
+    });
+  } catch (err) {
+    console.error('Restore permission error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1286,7 +1459,32 @@ router.put('/:scanId/files/:fileId/permissions/:permissionId', async (req: Reque
     }
 
     const drive = createDriveClient(req.session.accessToken);
-    const result = await updatePermissionRole(drive, fileId, permissionId, role);
+
+    // Drive APIから現在の権限リストを取得して、実際のpermissionIdを特定
+    const currentPermissions = await getFilePermissions(drive, fileId);
+    let actualPermissionId = permissionId;
+
+    // permissionIdがanyoneWithLinkなど特殊なIDの場合、実際のIDを探す
+    if (permissionId === 'anyoneWithLink' || permissionId === 'anyone') {
+      const matchingPerm = currentPermissions.find(p => p.type === 'anyone');
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    } else if (targetPermission) {
+      // スキャンデータの権限情報と照合して、実際のIDを特定
+      const matchingPerm = currentPermissions.find(p => {
+        if (p.type !== targetPermission.type) return false;
+        if (targetPermission.type === 'anyone') return p.type === 'anyone';
+        if (targetPermission.type === 'domain') return p.domain === targetPermission.domain;
+        if (targetPermission.emailAddress) return p.emailAddress === targetPermission.emailAddress;
+        return false;
+      });
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    }
+
+    const result = await updatePermissionRole(drive, fileId, actualPermissionId, role);
 
     // アクションログを記録
     await ActionLogService.logPermissionChange({
@@ -1298,14 +1496,14 @@ router.put('/:scanId/files/:fileId/permissions/:permissionId', async (req: Reque
       targetId: fileId,
       targetName: scannedFile?.name || fileId,
       details: {
-        permissionId,
+        permissionId: actualPermissionId,
         targetEmail: targetPermission?.emailAddress || targetPermission?.domain || undefined,
         targetType: targetPermission?.type,
         oldRole,
         newRole: role,
       },
       success: result.success,
-      errorMessage: result.error,
+      errorMessage: result.error || null,
     });
 
     if (!result.success) {
@@ -1581,7 +1779,7 @@ router.post('/:scanId/bulk/permissions/delete', async (req: Request, res: Respon
         failedCount,
       },
       success: successCount > 0,
-      errorMessage: failedCount > 0 ? `${failedCount}件の削除に失敗` : undefined,
+      errorMessage: failedCount > 0 ? `${failedCount}件の削除に失敗` : null,
     });
 
     res.json({
@@ -1719,7 +1917,7 @@ router.post('/:scanId/bulk/permissions/demote', async (req: Request, res: Respon
         failedCount,
       },
       success: successCount > 0,
-      errorMessage: failedCount > 0 ? `${failedCount}件の変更に失敗` : undefined,
+      errorMessage: failedCount > 0 ? `${failedCount}件の変更に失敗` : null,
     });
 
     res.json({
@@ -1837,7 +2035,7 @@ router.post('/:scanId/bulk/remove-public-access', async (req: Request, res: Resp
         failedCount,
       },
       success: successCount > 0,
-      errorMessage: failedCount > 0 ? `${failedCount}件の削除に失敗` : undefined,
+      errorMessage: failedCount > 0 ? `${failedCount}件の削除に失敗` : null,
     });
 
     res.json({
@@ -1923,7 +2121,7 @@ router.delete('/:scanId/folders/:folderId/permissions', async (req: Request, res
         affectedCount: result.success,
       },
       success: result.success > 0,
-      errorMessage: result.failed > 0 ? `${result.failed}件の削除に失敗` : undefined,
+      errorMessage: result.failed > 0 ? `${result.failed}件の削除に失敗` : null,
     });
 
     res.json({
@@ -1988,8 +2186,26 @@ router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', asy
       return res.status(403).json({ error: '権限変更は管理者またはフォルダオーナーのみ実行できます' });
     }
 
+    // Drive APIから現在の権限リストを取得して、実際のpermissionIdを特定
+    const currentPermissions = await getFilePermissions(drive, folderId);
+    let actualPermissionId = permissionId;
+
+    // permissionIdがanyoneWithLinkなど特殊なIDの場合、実際のIDを探す
+    if (permissionId === 'anyoneWithLink' || permissionId === 'anyone') {
+      const matchingPerm = currentPermissions.find(p => p.type === 'anyone');
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    } else {
+      // 通常のpermissionIdの場合も、現在の権限から実際のIDを確認
+      const matchingPerm = currentPermissions.find(p => p.id === permissionId);
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    }
+
     // フォルダの権限を削除（フォルダもファイルと同じDrive APIを使用）
-    const result = await deletePermission(drive, folderId, permissionId);
+    const result = await deletePermission(drive, folderId, actualPermissionId);
 
     // アクションログを記録
     await ActionLogService.logPermissionChange({
@@ -2001,10 +2217,10 @@ router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', asy
       targetId: folderId,
       targetName: folderName,
       details: {
-        permissionId,
+        permissionId: actualPermissionId,
       },
       success: result.success,
-      errorMessage: result.error,
+      errorMessage: result.error || null,
     });
 
     if (!result.success) {
@@ -2019,6 +2235,97 @@ router.delete('/:scanId/folders/:folderId/folder-permissions/:permissionId', asy
     });
   } catch (err) {
     console.error('Delete folder permission error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/scan/:scanId/folders/:folderId/folder-permissions/restore
+ * 削除したフォルダ権限を復元
+ */
+router.post('/:scanId/folders/:folderId/folder-permissions/restore', async (req: Request, res: Response) => {
+  const { scanId, folderId } = req.params;
+  const { type, role, emailAddress, domain, displayName } = req.body;
+  const organization = req.organization!;
+  const user = req.user!;
+
+  // タイプとロールのバリデーション
+  const validTypes = ['user', 'group', 'domain', 'anyone'];
+  const validRoles = ['reader', 'commenter', 'writer'];
+  if (!type || !validTypes.includes(type)) {
+    return res.status(400).json({ error: '有効なタイプを指定してください: user, group, domain, anyone' });
+  }
+  if (!role || !validRoles.includes(role)) {
+    return res.status(400).json({ error: '有効なロールを指定してください: reader, commenter, writer' });
+  }
+
+  try {
+    // スキャンの存在確認と権限チェック
+    const scan = await ScanService.getById(scanId);
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+    if (scan.organizationId !== organization.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // アクセストークンの確認
+    if (!req.session.accessToken) {
+      return res.status(401).json({ error: 'Access token not available' });
+    }
+
+    const drive = createDriveClient(req.session.accessToken);
+
+    // フォルダ情報を取得（オーナー情報含む）
+    const folderInfo = await getFolderInfo(drive, folderId);
+    const ownerPermission = folderInfo?.permissions?.find(p => p.role === 'owner');
+    const folderOwnerEmail = ownerPermission?.emailAddress || null;
+
+    // admin/owner またはフォルダオーナーのみ権限変更可能
+    if (!canModifyFolderPermission(user, folderOwnerEmail)) {
+      return res.status(403).json({ error: '権限復元は管理者またはフォルダオーナーのみ実行できます' });
+    }
+    const folderName = folderInfo?.name || folderId;
+
+    // 権限を復元（フォルダもファイルと同じAPI）
+    const result = await restorePermission(drive, folderId, {
+      type,
+      role,
+      emailAddress,
+      domain,
+    });
+
+    // アクションログを記録
+    await ActionLogService.logPermissionChange({
+      organizationId: organization.id,
+      userId: user.id,
+      userEmail: user.email,
+      actionType: 'permission_restore',
+      targetType: 'folder',
+      targetId: folderId,
+      targetName: folderName,
+      details: {
+        permissionId: result.permission?.id,
+        targetEmail: emailAddress || domain || undefined,
+        targetType: type,
+        newRole: role,
+      },
+      success: result.success,
+      errorMessage: result.error || null,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || '権限の復元に失敗しました' });
+    }
+
+    res.json({
+      success: true,
+      message: 'フォルダ権限を復元しました',
+      folderId,
+      permission: result.permission,
+    });
+  } catch (err) {
+    console.error('Restore folder permission error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2072,8 +2379,26 @@ router.put('/:scanId/folders/:folderId/folder-permissions/:permissionId', async 
       return res.status(403).json({ error: '権限変更は管理者またはフォルダオーナーのみ実行できます' });
     }
 
+    // Drive APIから現在の権限リストを取得して、実際のpermissionIdを特定
+    const currentPermissions = await getFilePermissions(drive, folderId);
+    let actualPermissionId = permissionId;
+
+    // permissionIdがanyoneWithLinkなど特殊なIDの場合、実際のIDを探す
+    if (permissionId === 'anyoneWithLink' || permissionId === 'anyone') {
+      const matchingPerm = currentPermissions.find(p => p.type === 'anyone');
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    } else {
+      // 通常のpermissionIdの場合も、現在の権限から実際のIDを確認
+      const matchingPerm = currentPermissions.find(p => p.id === permissionId);
+      if (matchingPerm) {
+        actualPermissionId = matchingPerm.id;
+      }
+    }
+
     // フォルダの権限を更新
-    const result = await updatePermissionRole(drive, folderId, permissionId, role);
+    const result = await updatePermissionRole(drive, folderId, actualPermissionId, role);
 
     // アクションログを記録
     await ActionLogService.logPermissionChange({
@@ -2085,11 +2410,11 @@ router.put('/:scanId/folders/:folderId/folder-permissions/:permissionId', async 
       targetId: folderId,
       targetName: folderName,
       details: {
-        permissionId,
+        permissionId: actualPermissionId,
         newRole: role,
       },
       success: result.success,
-      errorMessage: result.error,
+      errorMessage: result.error || null,
     });
 
     if (!result.success) {

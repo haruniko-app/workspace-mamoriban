@@ -179,6 +179,15 @@ export const scanApi = {
     api.delete<{ success: boolean; message: string; fileId: string; permissionId: string }>(
       `/api/scan/${scanId}/files/${fileId}/permissions/${permissionId}`
     ),
+  restorePermission: (
+    scanId: string,
+    fileId: string,
+    permission: { type: string; role: string; emailAddress?: string; domain?: string; displayName?: string }
+  ) =>
+    api.post<{ success: boolean; message: string; fileId: string; permission: ScannedFile['permissions'][0] }>(
+      `/api/scan/${scanId}/files/${fileId}/permissions/restore`,
+      permission
+    ),
   updatePermissionRole: (scanId: string, fileId: string, permissionId: string, role: 'reader' | 'commenter' | 'writer') =>
     api.put<{ success: boolean; message: string; fileId: string; permissionId: string; permission: ScannedFile['permissions'][0] }>(
       `/api/scan/${scanId}/files/${fileId}/permissions/${permissionId}`,
@@ -200,6 +209,15 @@ export const scanApi = {
   deleteFolderPermission: (scanId: string, folderId: string, permissionId: string) =>
     api.delete<{ success: boolean; message: string; folderId: string; permissionId: string }>(
       `/api/scan/${scanId}/folders/${folderId}/folder-permissions/${permissionId}`
+    ),
+  restoreFolderPermission: (
+    scanId: string,
+    folderId: string,
+    permission: { type: string; role: string; emailAddress?: string; domain?: string; displayName?: string }
+  ) =>
+    api.post<{ success: boolean; message: string; folderId: string; permission: ScannedFile['permissions'][0] }>(
+      `/api/scan/${scanId}/folders/${folderId}/folder-permissions/restore`,
+      permission
     ),
   updateFolderPermissionRole: (scanId: string, folderId: string, permissionId: string, role: 'reader' | 'commenter' | 'writer') =>
     api.put<{ success: boolean; message: string; folderId: string; permissionId: string; permission: ScannedFile['permissions'][0] }>(
@@ -347,6 +365,8 @@ export interface ScannedFile {
     emailAddress: string | null;
     domain: string | null;
     displayName: string | null;
+    deleted?: boolean;           // 削除済みフラグ（元に戻す用）
+    deletedAt?: string;          // 削除日時
   }[];
   riskScore: number;
   riskLevel: 'critical' | 'high' | 'medium' | 'low';

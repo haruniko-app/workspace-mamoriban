@@ -19,21 +19,27 @@ const RISK_LEVEL_CONFIG: Record<RiskLevel, { label: string; color: string; bgCol
 };
 
 function FileDetailModal({
-  file,
+  file: initialFile,
   onClose,
   scanId,
-  onPermissionChange,
   onNavigateToFolder,
 }: {
   file: ScannedFile;
   onClose: () => void;
   scanId: string;
-  onPermissionChange?: () => void;
   onNavigateToFolder?: (folderId: string) => void;
 }) {
-  const config = RISK_LEVEL_CONFIG[file.riskLevel];
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // ファイルデータをクエリで取得（削除後の更新を反映するため）
+  const { data: fileData } = useQuery({
+    queryKey: ['file', scanId, initialFile.id],
+    queryFn: () => scanApi.getFile(scanId, initialFile.id),
+    initialData: { file: initialFile },
+  });
+  const file = fileData?.file || initialFile;
+  const config = RISK_LEVEL_CONFIG[file.riskLevel];
 
   // ファイル/フォルダの権限変更が可能かチェック
   // admin/owner ロール、またはファイルオーナーなら可能
@@ -56,6 +62,7 @@ function FileDetailModal({
     type: 'delete' | 'changeRole';
     permissionId: string;
     permissionLabel: string;
+    permission?: ScannedFile['permissions'][0];
     newRole?: 'reader' | 'commenter' | 'writer';
     folderId?: string;
   } | null>(null);
@@ -75,17 +82,39 @@ function FileDetailModal({
 
   // Permission delete mutation
   const deleteMutation = useMutation({
-    mutationFn: ({ permissionId }: { permissionId: string }) =>
+    mutationFn: ({ permissionId }: { permissionId: string; permission: ScannedFile['permissions'][0] }) =>
       scanApi.deletePermission(scanId, file.id, permissionId),
     onSuccess: () => {
-      setOperationResult({ type: 'success', message: '権限を削除しました' });
+      setOperationResult({ type: 'success', message: '権限を削除しました（リスク評価は次回スキャン時に更新されます）' });
+      queryClient.invalidateQueries({ queryKey: ['file', scanId, file.id] });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      onPermissionChange?.();
-      setTimeout(() => setOperationResult(null), 3000);
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : '権限の削除に失敗しました' });
+    },
+  });
+
+  // Permission restore mutation
+  const restoreMutation = useMutation({
+    mutationFn: ({ permission }: { permission: ScannedFile['permissions'][0] }) =>
+      scanApi.restorePermission(scanId, file.id, {
+        type: permission.type,
+        role: permission.role === 'owner' ? 'reader' : permission.role,
+        emailAddress: permission.emailAddress ?? undefined,
+        domain: permission.domain ?? undefined,
+        displayName: permission.displayName ?? undefined,
+      }),
+    onSuccess: () => {
+      setOperationResult({ type: 'success', message: '権限を復元しました' });
+      queryClient.invalidateQueries({ queryKey: ['file', scanId, file.id] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      setTimeout(() => setOperationResult(null), 5000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : '権限の復元に失敗しました' });
     },
   });
 
@@ -95,11 +124,10 @@ function FileDetailModal({
       scanApi.updatePermissionRole(scanId, file.id, permissionId, role),
     onSuccess: (_, variables) => {
       const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
-      setOperationResult({ type: 'success', message: `${roleLabel}に変更しました` });
+      setOperationResult({ type: 'success', message: `${roleLabel}に変更しました（リスク評価は次回スキャン時に更新されます）` });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      onPermissionChange?.();
-      setTimeout(() => setOperationResult(null), 3000);
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : '権限の変更に失敗しました' });
@@ -111,11 +139,11 @@ function FileDetailModal({
     mutationFn: ({ folderId, permissionId }: { folderId: string; permissionId: string }) =>
       scanApi.deleteFolderPermission(scanId, folderId, permissionId),
     onSuccess: () => {
-      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました' });
+      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました（リスク評価は次回スキャン時に更新されます）' });
       queryClient.invalidateQueries({ queryKey: ['folderPath'] });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      setTimeout(() => setOperationResult(null), 3000);
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の削除に失敗しました' });
@@ -128,11 +156,11 @@ function FileDetailModal({
       scanApi.updateFolderPermissionRole(scanId, folderId, permissionId, role),
     onSuccess: (_, variables) => {
       const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
-      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました` });
+      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました（リスク評価は次回スキャン時に更新されます）` });
       queryClient.invalidateQueries({ queryKey: ['folderPath'] });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      setTimeout(() => setOperationResult(null), 3000);
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の変更に失敗しました' });
@@ -150,8 +178,8 @@ function FileDetailModal({
       }
     } else {
       // File permission operation
-      if (confirmDialog.type === 'delete') {
-        deleteMutation.mutate({ permissionId: confirmDialog.permissionId });
+      if (confirmDialog.type === 'delete' && confirmDialog.permission) {
+        deleteMutation.mutate({ permissionId: confirmDialog.permissionId, permission: confirmDialog.permission });
       } else if (confirmDialog.type === 'changeRole' && confirmDialog.newRole) {
         changeRoleMutation.mutate({ permissionId: confirmDialog.permissionId, role: confirmDialog.newRole });
       }
@@ -159,7 +187,7 @@ function FileDetailModal({
     setConfirmDialog(null);
   };
 
-  const isLoading = deleteMutation.isPending || changeRoleMutation.isPending || folderDeleteMutation.isPending || folderChangeRoleMutation.isPending;
+  const isLoading = deleteMutation.isPending || restoreMutation.isPending || changeRoleMutation.isPending || folderDeleteMutation.isPending || folderChangeRoleMutation.isPending;
 
   // Google Drive共有設定URLを生成
   const getShareUrl = (fileId: string) => {
@@ -528,8 +556,10 @@ function FileDetailModal({
               )}
             </div>
             <div className="space-y-2">
-              {file.permissions.map((perm) => (
-                <div key={perm.id} className="flex items-center gap-3 p-3 bg-[#f8f9fa] rounded-lg">
+              {file.permissions.map((perm) => {
+                const isDeleted = perm.deleted === true;
+                return (
+                <div key={perm.id} className={`flex items-center gap-3 p-3 rounded-lg ${isDeleted ? 'bg-[#fce8e6] opacity-60' : 'bg-[#f8f9fa]'}`}>
                   <div className="w-8 h-8 rounded-full bg-[#dadce0] flex items-center justify-center flex-shrink-0">
                     {perm.type === 'anyone' ? (
                       <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
@@ -564,7 +594,7 @@ function FileDetailModal({
                     </p>
                   </div>
                   {/* Permission Action Buttons */}
-                  {canModifyPermission(perm) && (
+                  {canModifyPermission(perm) && !isDeleted && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {/* Role selector dropdown */}
                       <select
@@ -592,6 +622,7 @@ function FileDetailModal({
                           type: 'delete',
                           permissionId: perm.id,
                           permissionLabel: getPermissionLabel(perm),
+                          permission: perm,
                         })}
                         disabled={isLoading}
                         className="p-1.5 text-[#c5221f] hover:bg-[#fce8e6] rounded transition-colors disabled:opacity-50"
@@ -603,8 +634,23 @@ function FileDetailModal({
                       </button>
                     </div>
                   )}
+                  {isDeleted && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs text-[#c5221f] bg-[#fce8e6] px-2 py-0.5 rounded">
+                        削除済み
+                      </span>
+                      <button
+                        onClick={() => restoreMutation.mutate({ permission: perm })}
+                        disabled={isLoading}
+                        className="px-2 py-0.5 text-xs text-[#1a73e8] bg-[#e8f0fe] hover:bg-[#d2e3fc] rounded transition-colors disabled:opacity-50"
+                        title="権限を復元"
+                      >
+                        元に戻す
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              );})}
             </div>
           </div>
         </div>
@@ -1050,20 +1096,18 @@ function FolderPermissionsModal({
   folder,
   onClose,
   scanId,
-  onPermissionChange,
 }: {
   folder: FolderPathItem;
   onClose: () => void;
   scanId: string;
-  onPermissionChange?: () => void;
 }) {
-  const queryClient = useQueryClient();
   const { user } = useAuth();
 
   const [confirmDialog, setConfirmDialog] = useState<{
     type: 'delete' | 'changeRole';
     permissionId: string;
     permissionLabel: string;
+    permission?: FolderPathItem['permissions'][0];
     newRole?: 'reader' | 'commenter' | 'writer';
   } | null>(null);
   const [operationResult, setOperationResult] = useState<{
@@ -1079,20 +1123,43 @@ function FolderPermissionsModal({
     return ownerPerm?.emailAddress === user.email;
   };
 
+  const queryClient = useQueryClient();
+
   // Folder permission delete mutation
   const folderDeleteMutation = useMutation({
-    mutationFn: ({ permissionId }: { permissionId: string }) =>
+    mutationFn: ({ permissionId }: { permissionId: string; permission: FolderPathItem['permissions'][0] }) =>
       scanApi.deleteFolderPermission(scanId, folder.id, permissionId),
     onSuccess: () => {
-      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました' });
+      setOperationResult({ type: 'success', message: 'フォルダ権限を削除しました（リスク評価は次回スキャン時に更新されます）' });
       queryClient.invalidateQueries({ queryKey: ['folderPath'] });
       queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
       queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      onPermissionChange?.();
-      setTimeout(() => setOperationResult(null), 3000);
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の削除に失敗しました' });
+    },
+  });
+
+  // Folder permission restore mutation
+  const folderRestoreMutation = useMutation({
+    mutationFn: ({ permission }: { permission: FolderPathItem['permissions'][0] }) =>
+      scanApi.restoreFolderPermission(scanId, folder.id, {
+        type: permission.type,
+        role: permission.role === 'owner' ? 'reader' : permission.role,
+        emailAddress: permission.emailAddress ?? undefined,
+        domain: permission.domain ?? undefined,
+        displayName: permission.displayName ?? undefined,
+      }),
+    onSuccess: () => {
+      setOperationResult({ type: 'success', message: 'フォルダ権限を復元しました' });
+      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
+      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
+      setTimeout(() => setOperationResult(null), 5000);
+    },
+    onError: (error) => {
+      setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の復元に失敗しました' });
     },
   });
 
@@ -1102,12 +1169,8 @@ function FolderPermissionsModal({
       scanApi.updateFolderPermissionRole(scanId, folder.id, permissionId, role),
     onSuccess: (_, variables) => {
       const roleLabel = variables.role === 'reader' ? '閲覧者' : variables.role === 'commenter' ? 'コメント可' : '編集者';
-      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました` });
-      queryClient.invalidateQueries({ queryKey: ['folderPath'] });
-      queryClient.invalidateQueries({ queryKey: ['scanFiles'] });
-      queryClient.invalidateQueries({ queryKey: ['scanFolders'] });
-      onPermissionChange?.();
-      setTimeout(() => setOperationResult(null), 3000);
+      setOperationResult({ type: 'success', message: `フォルダ権限を${roleLabel}に変更しました（リスク評価は次回スキャン時に更新されます）` });
+      setTimeout(() => setOperationResult(null), 5000);
     },
     onError: (error) => {
       setOperationResult({ type: 'error', message: error instanceof Error ? error.message : 'フォルダ権限の変更に失敗しました' });
@@ -1116,15 +1179,15 @@ function FolderPermissionsModal({
 
   const handleConfirm = () => {
     if (!confirmDialog) return;
-    if (confirmDialog.type === 'delete') {
-      folderDeleteMutation.mutate({ permissionId: confirmDialog.permissionId });
+    if (confirmDialog.type === 'delete' && confirmDialog.permission) {
+      folderDeleteMutation.mutate({ permissionId: confirmDialog.permissionId, permission: confirmDialog.permission });
     } else if (confirmDialog.type === 'changeRole' && confirmDialog.newRole) {
       folderChangeRoleMutation.mutate({ permissionId: confirmDialog.permissionId, role: confirmDialog.newRole });
     }
     setConfirmDialog(null);
   };
 
-  const isLoading = folderDeleteMutation.isPending || folderChangeRoleMutation.isPending;
+  const isLoading = folderDeleteMutation.isPending || folderRestoreMutation.isPending || folderChangeRoleMutation.isPending;
 
   // Get normalized role for display
   const getNormalizedRole = (perm: FolderPathItem['permissions'][0]): 'reader' | 'commenter' | 'writer' | 'owner' => {
@@ -1215,8 +1278,10 @@ function FolderPermissionsModal({
             {folder.permissions.length === 0 ? (
               <p className="text-sm text-[#5f6368]">権限情報がありません</p>
             ) : (
-              folder.permissions.map((perm) => (
-                <div key={perm.id} className="flex items-center gap-3 p-3 bg-[#f8f9fa] rounded-lg">
+              folder.permissions.map((perm) => {
+                const isDeleted = perm.deleted === true;
+                return (
+                <div key={perm.id} className={`flex items-center gap-3 p-3 rounded-lg ${isDeleted ? 'bg-[#fce8e6] opacity-60' : 'bg-[#f8f9fa]'}`}>
                   {/* Permission Icon */}
                   <div className="w-8 h-8 rounded-full bg-[#dadce0] flex items-center justify-center flex-shrink-0">
                     {perm.type === 'anyone' ? (
@@ -1249,7 +1314,7 @@ function FolderPermissionsModal({
                     <span className="text-sm text-[#5f6368] px-2 py-1 bg-[#e8eaed] rounded">
                       オーナー
                     </span>
-                  ) : canModifyFolderPermission() ? (
+                  ) : canModifyFolderPermission() && !isDeleted ? (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {/* Role Dropdown */}
                       <select
@@ -1279,6 +1344,7 @@ function FolderPermissionsModal({
                           type: 'delete',
                           permissionId: perm.id,
                           permissionLabel: getPermissionLabel(perm),
+                          permission: perm,
                         })}
                         disabled={isLoading}
                         className="p-1.5 text-[#c5221f] hover:bg-[#fce8e6] rounded transition-colors disabled:opacity-50"
@@ -1295,8 +1361,23 @@ function FolderPermissionsModal({
                        getNormalizedRole(perm) === 'commenter' ? 'コメント可' : '閲覧者'}
                     </span>
                   )}
+                  {isDeleted && (
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <span className="text-xs text-[#c5221f] bg-[#fce8e6] px-2 py-0.5 rounded">
+                        削除済み
+                      </span>
+                      <button
+                        onClick={() => folderRestoreMutation.mutate({ permission: perm })}
+                        disabled={isLoading}
+                        className="px-2 py-0.5 text-xs text-[#1a73e8] bg-[#e8f0fe] hover:bg-[#d2e3fc] rounded transition-colors disabled:opacity-50"
+                        title="権限を復元"
+                      >
+                        元に戻す
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))
+              );})
             )}
           </div>
         </div>
@@ -2162,7 +2243,6 @@ export function FilesPage() {
           file={selectedFile}
           onClose={() => setSelectedFile(null)}
           scanId={scanId}
-          onPermissionChange={() => setSelectedFile(null)}
           onNavigateToFolder={(folderId) => {
             setSelectedFile(null);
             setViewMode('folders');
@@ -2177,7 +2257,6 @@ export function FilesPage() {
           folder={folderPermissionsPanel}
           onClose={() => setFolderPermissionsPanel(null)}
           scanId={scanId}
-          onPermissionChange={() => setFolderPermissionsPanel(null)}
         />
       )}
 

@@ -141,6 +141,8 @@ export interface ScannedFile {
     emailAddress: string | null;
     domain: string | null;
     displayName: string | null;
+    deleted?: boolean;           // 削除済みフラグ（元に戻す用）
+    deletedAt?: Date;            // 削除日時
   }[];
 
   // リスク評価
@@ -198,7 +200,7 @@ export interface ActionLog {
   userEmail: string;               // 実行したユーザーのメール
 
   // アクション情報
-  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update';
+  actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update' | 'permission_restore';
   targetType: 'file' | 'folder';
   targetId: string;                // ファイルまたはフォルダID
   targetName: string;              // ファイルまたはフォルダ名
@@ -223,7 +225,7 @@ export interface ActionLog {
 
   // 結果
   success: boolean;
-  errorMessage?: string;
+  errorMessage: string | null;
 
   createdAt: Date;
 }

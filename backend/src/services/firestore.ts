@@ -1265,23 +1265,34 @@ export const ActionLogService = {
    * アクションログを作成
    */
   async create(data: Omit<ActionLog, 'id' | 'createdAt'>): Promise<ActionLog> {
+    console.log('[ActionLog] Creating action log:', JSON.stringify(data, null, 2));
     const docRef = actionLogsRef.doc();
     // detailsからundefined値を除去（Firestoreはundefinedを受け付けない）
     const cleanedDetails = Object.fromEntries(
       Object.entries(data.details).filter(([, value]) => value !== undefined)
     ) as ActionLog['details'];
+    // errorMessageはnullまたはstringを必ず設定
+    const { errorMessage, ...restData } = data;
     const log: ActionLog = {
-      ...data,
+      ...restData,
       details: cleanedDetails,
       id: docRef.id,
       createdAt: new Date(),
+      errorMessage: errorMessage ?? null,
     };
-    await docRef.set(log);
+    try {
+      await docRef.set(log);
+      console.log('[ActionLog] Successfully saved action log:', log.id);
+    } catch (err) {
+      console.error('[ActionLog] Failed to save action log:', err);
+      throw err;
+    }
     return log;
   },
 
   /**
    * 組織のアクションログを取得
+   * Firestoreインデックスの問題を回避するため、メモリ上でソート・フィルタを実行
    */
   async getByOrganization(
     organizationId: string,
@@ -1294,37 +1305,44 @@ export const ActionLogService = {
     } = {}
   ): Promise<{ logs: ActionLog[]; total: number }> {
     const { limit = 20, offset = 0, actionType, startDate, endDate } = options;
+    console.log('[ActionLog] getByOrganization:', { organizationId, options });
 
-    let query: FirebaseFirestore.Query = actionLogsRef
+    // シンプルなクエリでデータ取得（インデックス不要）
+    const query: FirebaseFirestore.Query = actionLogsRef
       .where('organizationId', '==', organizationId);
 
-    if (actionType) {
-      query = query.where('actionType', '==', actionType);
-    }
-
-    if (startDate) {
-      query = query.where('createdAt', '>=', startDate);
-    }
-
-    if (endDate) {
-      query = query.where('createdAt', '<=', endDate);
-    }
-
-    // カウント取得
-    const countSnapshot = await query.count().get();
-    const total = countSnapshot.data().count;
-
-    // データ取得（日時順）
-    query = query.orderBy('createdAt', 'desc').offset(offset).limit(limit);
     const snapshot = await query.get();
+    console.log('[ActionLog] Found', snapshot.docs.length, 'logs for org:', organizationId);
 
-    const logs = snapshot.docs.map((doc) => {
+    // メモリ上でフィルタ・ソート
+    let logs = snapshot.docs.map((doc) => {
       const data = doc.data() as ActionLog;
       return {
         ...data,
         createdAt: toISOString(data.createdAt) as unknown as Date,
       };
     });
+
+    // actionTypeでフィルタ
+    if (actionType) {
+      logs = logs.filter((log) => log.actionType === actionType);
+    }
+
+    // 日付範囲でフィルタ
+    if (startDate) {
+      logs = logs.filter((log) => new Date(log.createdAt) >= startDate);
+    }
+    if (endDate) {
+      logs = logs.filter((log) => new Date(log.createdAt) <= endDate);
+    }
+
+    // createdAtで降順ソート
+    logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = logs.length;
+
+    // ページネーション
+    logs = logs.slice(offset, offset + limit);
 
     return { logs, total };
   },
@@ -1336,13 +1354,13 @@ export const ActionLogService = {
     organizationId: string;
     userId: string;
     userEmail: string;
-    actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update';
+    actionType: 'permission_delete' | 'permission_update' | 'permission_bulk_delete' | 'permission_bulk_update' | 'permission_restore';
     targetType: 'file' | 'folder';
     targetId: string;
     targetName: string;
     details: ActionLog['details'];
     success: boolean;
-    errorMessage?: string;
+    errorMessage: string | null;
   }): Promise<ActionLog> {
     return this.create(params);
   },
