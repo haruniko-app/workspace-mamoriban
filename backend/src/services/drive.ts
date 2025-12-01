@@ -301,6 +301,7 @@ export async function countAllFiles(
 
 /**
  * 全ファイルをスキャン（バッチ処理）
+ * batchSizeを1000に設定してAPI呼び出し回数を削減
  */
 export async function* scanAllFiles(
   drive: drive_v3.Drive,
@@ -309,7 +310,7 @@ export async function* scanAllFiles(
     maxFiles?: number;
   } = {}
 ): AsyncGenerator<DriveFile[], void, unknown> {
-  const { batchSize = 100, maxFiles = Infinity } = options;
+  const { batchSize = 1000, maxFiles = Infinity } = options; // 100→1000に最適化
   let pageToken: string | null = null;
   let totalFiles = 0;
 
@@ -331,6 +332,7 @@ export async function* scanAllFiles(
 
 /**
  * フォルダ名を一括取得（キャッシュ付き）
+ * 並列度を20に設定してAPI呼び出しを高速化
  */
 export async function getFolderNames(
   drive: drive_v3.Drive,
@@ -343,8 +345,8 @@ export async function getFolderNames(
     return result;
   }
 
-  // 並列で取得（APIレート制限を考慮して10件ずつ）
-  const BATCH_SIZE = 10;
+  // 並列で取得（APIレート制限を考慮して20件ずつ - 10→20に最適化）
+  const BATCH_SIZE = 20;
   for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
     const batch = uniqueIds.slice(i, i + BATCH_SIZE);
     const promises = batch.map(async (folderId) => {
@@ -364,6 +366,58 @@ export async function getFolderNames(
     const results = await Promise.all(promises);
     for (const { id, name } of results) {
       result.set(id, name);
+    }
+  }
+
+  return result;
+}
+
+export interface FolderBasicInfo {
+  id: string;
+  name: string;
+  parentFolderId: string | null;
+}
+
+/**
+ * フォルダの詳細情報を一括取得（名前と親フォルダID）
+ * 並列度を20に設定してAPI呼び出しを高速化
+ */
+export async function getFolderInfoBatch(
+  drive: drive_v3.Drive,
+  folderIds: string[]
+): Promise<Map<string, FolderBasicInfo>> {
+  const result = new Map<string, FolderBasicInfo>();
+  const uniqueIds = [...new Set(folderIds.filter((id) => id))];
+
+  if (uniqueIds.length === 0) {
+    return result;
+  }
+
+  // 並列で取得（APIレート制限を考慮して20件ずつ - 10→20に最適化）
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+    const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+    const promises = batch.map(async (folderId) => {
+      try {
+        const response = await drive.files.get({
+          fileId: folderId,
+          fields: 'id,name,parents',
+        });
+        return {
+          id: folderId,
+          name: response.data.name || '',
+          parentFolderId: response.data.parents?.[0] || null,
+        };
+      } catch (error) {
+        // フォルダにアクセスできない場合（権限なし、削除済み等）
+        console.warn(`Failed to get folder info for ${folderId}:`, error);
+        return { id: folderId, name: '', parentFolderId: null };
+      }
+    });
+
+    const results = await Promise.all(promises);
+    for (const info of results) {
+      result.set(info.id, info);
     }
   }
 
@@ -578,4 +632,154 @@ export async function getFileFolderPath(
   }
 
   return path;
+}
+
+/**
+ * 変更トークン関連の型定義
+ */
+export interface DriveChange {
+  fileId: string;
+  removed: boolean;
+  file: DriveFile | null;
+}
+
+export interface ChangesResult {
+  changes: DriveChange[];
+  newStartPageToken: string;
+  hasMore: boolean;
+}
+
+/**
+ * Drive Changes APIの初期トークンを取得
+ * フルスキャン完了時に取得して保存し、次回差分スキャンで使用する
+ */
+export async function getStartPageToken(drive: drive_v3.Drive): Promise<string> {
+  const response = await drive.changes.getStartPageToken();
+  return response.data.startPageToken || '';
+}
+
+/**
+ * 指定したトークン以降の変更を取得
+ * 差分スキャン時に使用
+ */
+export async function listChanges(
+  drive: drive_v3.Drive,
+  pageToken: string,
+  options: {
+    pageSize?: number;
+  } = {}
+): Promise<ChangesResult> {
+  const { pageSize = 1000 } = options;
+
+  const changes: DriveChange[] = [];
+  let currentPageToken = pageToken;
+  let newStartPageToken = '';
+
+  // 全ての変更を取得するまでページングを続ける
+  while (true) {
+    const response = await drive.changes.list({
+      pageToken: currentPageToken,
+      pageSize,
+      fields: 'nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,webViewLink,iconLink,createdTime,modifiedTime,size,owners(emailAddress,displayName),sharingUser(emailAddress,displayName),shared,permissions(id,type,role,emailAddress,domain,displayName),parents))',
+      includeRemoved: true,
+      spaces: 'drive',
+    });
+
+    const data = response.data;
+
+    // 変更を処理
+    if (data.changes) {
+      for (const change of data.changes) {
+        const driveChange: DriveChange = {
+          fileId: change.fileId || '',
+          removed: change.removed || false,
+          file: null,
+        };
+
+        // ファイル情報がある場合は変換
+        if (change.file && !change.removed) {
+          const f = change.file;
+          driveChange.file = {
+            id: f.id || '',
+            name: f.name || '',
+            mimeType: f.mimeType || '',
+            webViewLink: f.webViewLink || null,
+            iconLink: f.iconLink || null,
+            createdTime: f.createdTime || null,
+            modifiedTime: f.modifiedTime || null,
+            size: f.size || null,
+            owners: (f.owners || []).map((o) => ({
+              email: o.emailAddress || '',
+              displayName: o.displayName || '',
+            })),
+            sharingUser: f.sharingUser
+              ? {
+                  email: f.sharingUser.emailAddress || '',
+                  displayName: f.sharingUser.displayName || '',
+                }
+              : null,
+            shared: f.shared || false,
+            permissions: (f.permissions || []).map((p) => ({
+              id: p.id || '',
+              type: p.type as DrivePermission['type'],
+              role: p.role as DrivePermission['role'],
+              emailAddress: p.emailAddress || null,
+              domain: p.domain || null,
+              displayName: p.displayName || null,
+            })),
+            parents: f.parents || [],
+          };
+        }
+
+        changes.push(driveChange);
+      }
+    }
+
+    // 次のページトークンがあれば続行
+    if (data.nextPageToken) {
+      currentPageToken = data.nextPageToken;
+    } else {
+      // 完了。新しいトークンを保存
+      newStartPageToken = data.newStartPageToken || '';
+      break;
+    }
+  }
+
+  return {
+    changes,
+    newStartPageToken,
+    hasMore: false, // 全て取得済み
+  };
+}
+
+/**
+ * 変更されたファイルIDのセットを取得
+ * 差分スキャン時に、どのファイルを再スキャンするか判定に使用
+ */
+export async function getChangedFileIds(
+  drive: drive_v3.Drive,
+  pageToken: string
+): Promise<{
+  changedFileIds: Set<string>;
+  removedFileIds: Set<string>;
+  newStartPageToken: string;
+}> {
+  const result = await listChanges(drive, pageToken);
+
+  const changedFileIds = new Set<string>();
+  const removedFileIds = new Set<string>();
+
+  for (const change of result.changes) {
+    if (change.removed) {
+      removedFileIds.add(change.fileId);
+    } else {
+      changedFileIds.add(change.fileId);
+    }
+  }
+
+  return {
+    changedFileIds,
+    removedFileIds,
+    newStartPageToken: result.newStartPageToken,
+  };
 }

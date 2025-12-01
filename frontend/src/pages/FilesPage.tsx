@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { scanApi, type ScannedFile, type FolderSummary, type FolderPathItem, type BulkOperationResult } from '../lib/api';
+import { scanApi, authApi, isAuthenticationError, type ScannedFile, type FolderSummary, type FolderPathItem, type BulkOperationResult } from '../lib/api';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,11 +23,13 @@ function FileDetailModal({
   onClose,
   scanId,
   onPermissionChange,
+  onNavigateToFolder,
 }: {
   file: ScannedFile;
   onClose: () => void;
   scanId: string;
   onPermissionChange?: () => void;
+  onNavigateToFolder?: (folderId: string) => void;
 }) {
   const config = RISK_LEVEL_CONFIG[file.riskLevel];
   const queryClient = useQueryClient();
@@ -211,15 +213,16 @@ function FileDetailModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Folder Path Breadcrumb - Google Drive Style */}
-          <div className="flex items-center gap-1 text-sm overflow-x-auto">
-            <svg className="w-4 h-4 text-[#5f6368] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-            </svg>
-            {isFolderPathLoading ? (
-              <span className="text-[#5f6368]">読み込み中...</span>
-            ) : folderPath.length === 0 ? (
-              <span className="text-[#5f6368]">マイドライブ</span>
-            ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 text-sm overflow-x-auto flex-1">
+              <svg className="w-4 h-4 text-[#5f6368] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+              </svg>
+              {isFolderPathLoading ? (
+                <span className="text-[#5f6368]">読み込み中...</span>
+              ) : folderPath.length === 0 ? (
+                <span className="text-[#5f6368]">マイドライブ</span>
+              ) : (
               <>
                 {/* Show ellipsis if path is deep (more than 3 levels) */}
                 {folderPath.length > 3 && (
@@ -236,7 +239,7 @@ function FileDetailModal({
                 )}
                 {/* Show last 3 folders (or all if less than 3) */}
                 {(folderPath.length > 3 ? folderPath.slice(-3) : folderPath).map((folder, index, arr) => (
-                  <div key={folder.id} className="flex items-center gap-1">
+                  <div key={folder.id} className="flex items-center gap-1 group/folder">
                     {index > 0 && <span className="text-[#5f6368]">&gt;</span>}
                     <button
                       onClick={() => setSelectedFolder(folder)}
@@ -245,11 +248,23 @@ function FileDetailModal({
                           ? 'bg-[#e8f0fe] text-[#1a73e8]'
                           : 'text-[#5f6368] hover:bg-[#f1f3f4]'
                       }`}
-                      title={folder.name}
+                      title={`${folder.name}の権限を表示`}
                     >
                       {folder.name}
                     </button>
-                    {/* Show dropdown on last folder */}
+                    {/* Navigate to folder view button - visible on hover */}
+                    {onNavigateToFolder && (
+                      <button
+                        onClick={() => onNavigateToFolder(folder.id)}
+                        className="p-1 text-[#1a73e8] hover:bg-[#e8f0fe] rounded transition-colors opacity-0 group-hover/folder:opacity-100"
+                        title={`${folder.name}フォルダを表示`}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* Google Drive link on last folder */}
                     {index === arr.length - 1 && (
                       <a
                         href={`https://drive.google.com/drive/folders/${folder.id}`}
@@ -266,6 +281,20 @@ function FileDetailModal({
                   </div>
                 ))}
               </>
+            )}
+            </div>
+            {/* Navigate to Folder View Button */}
+            {onNavigateToFolder && file.parentFolderId && (
+              <button
+                onClick={() => onNavigateToFolder(file.parentFolderId!)}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#1a73e8] bg-[#e8f0fe] hover:bg-[#d2e3fc] rounded-lg transition-colors"
+                title="フォルダ内のファイルを表示"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                </svg>
+                フォルダを表示
+              </button>
             )}
           </div>
 
@@ -286,6 +315,18 @@ function FileDetailModal({
                   >
                     開く
                   </a>
+                  {onNavigateToFolder && (
+                    <button
+                      onClick={() => onNavigateToFolder(selectedFolder.id)}
+                      className="flex items-center gap-1 text-[#1a73e8] hover:bg-[#e8f0fe] rounded px-2 py-0.5 text-sm transition-colors"
+                      title="フォルダ内のファイルを表示"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                      </svg>
+                      フォルダを表示
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={() => setSelectedFolder(null)}
@@ -691,12 +732,14 @@ function FolderCard({
   onToggle,
   onFileClick,
   scanId,
+  onNavigateToFolder,
 }: {
   folder: FolderSummary;
   isExpanded: boolean;
   onToggle: () => void;
   onFileClick: (file: ScannedFile) => void;
   scanId: string;
+  onNavigateToFolder?: (folderId: string) => void;
 }) {
   const config = RISK_LEVEL_CONFIG[folder.highestRiskLevel];
 
@@ -718,6 +761,15 @@ function FolderCard({
   });
 
   const folderPath = folderPathData?.folderPath || [];
+
+  // Fetch subfolders when expanded
+  const { data: subfoldersData, isLoading: isSubfoldersLoading } = useQuery({
+    queryKey: ['subfolders', scanId, folder.id],
+    queryFn: () => scanApi.getSubfolders(scanId, folder.id),
+    enabled: isExpanded,
+  });
+
+  const subfolders = subfoldersData?.subfolders || [];
 
   return (
     <div className={`border border-[#dadce0] rounded-xl overflow-hidden ${isExpanded ? 'ring-2 ring-[#1a73e8]' : ''}`}>
@@ -790,21 +842,85 @@ function FolderCard({
                   <div className="flex items-center gap-1 overflow-x-auto">
                     <span>マイドライブ</span>
                     {folderPath.map((pathFolder) => (
-                      <span key={pathFolder.id} className="flex items-center gap-1">
+                      <span key={pathFolder.id} className="group/pathfolder flex items-center gap-1">
                         <span className="text-[#9aa0a6]">/</span>
-                        <a
-                          href={`https://drive.google.com/drive/folders/${pathFolder.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-[#1a73e8] hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {pathFolder.name}
-                        </a>
+                        <span className="flex items-center gap-0.5">
+                          <a
+                            href={`https://drive.google.com/drive/folders/${pathFolder.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-[#1a73e8] hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {pathFolder.name}
+                          </a>
+                          {onNavigateToFolder && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToFolder(pathFolder.id);
+                              }}
+                              className="p-0.5 text-[#1a73e8] hover:bg-[#e8f0fe] rounded transition-colors opacity-0 group-hover/pathfolder:opacity-100"
+                              title={`${pathFolder.name}フォルダを表示`}
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                              </svg>
+                            </button>
+                          )}
+                        </span>
                       </span>
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Subfolders Section */}
+          {!isSubfoldersLoading && subfolders.length > 0 && (
+            <div className="border-b border-[#e8eaed] bg-white">
+              <div className="px-4 py-2 border-b border-[#e8eaed]">
+                <span className="text-xs font-medium text-[#5f6368]">サブフォルダ ({subfolders.length}件)</span>
+              </div>
+              <div className="divide-y divide-[#e8eaed]">
+                {subfolders.map((subfolder) => {
+                  const subConfig = RISK_LEVEL_CONFIG[subfolder.highestRiskLevel];
+                  return (
+                    <div
+                      key={subfolder.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigateToFolder) {
+                          onNavigateToFolder(subfolder.id);
+                        }
+                      }}
+                      className={`flex items-center gap-3 px-4 py-2 hover:bg-[#f8f9fa] ${onNavigateToFolder ? 'cursor-pointer' : ''}`}
+                    >
+                      {/* Folder Icon */}
+                      <div className="w-6 h-6 bg-[#f1f3f4] rounded flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                        </svg>
+                      </div>
+                      {/* Folder Name */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[#202124] truncate">{subfolder.name}</p>
+                        <p className="text-xs text-[#5f6368]">{subfolder.fileCount}件のファイル</p>
+                      </div>
+                      {/* Risk Badge */}
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${subConfig.bgColor} ${subConfig.color}`}>
+                        {subConfig.label}
+                      </span>
+                      {/* Navigate Arrow */}
+                      {onNavigateToFolder && (
+                        <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                        </svg>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -821,11 +937,22 @@ function FolderCard({
               ファイルがありません
             </div>
           ) : (
-            <div className="divide-y divide-[#e8eaed]">
-              {files.map((file) => (
-                <FileRow key={file.id} file={file} onClick={() => onFileClick(file)} />
-              ))}
-            </div>
+            <>
+              {/* File List Header */}
+              <div className="flex items-center gap-4 px-4 py-2 bg-[#f8f9fa] border-b border-[#e8eaed] text-xs text-[#5f6368]">
+                <div className="w-6 flex-shrink-0" /> {/* Icon spacer */}
+                <div className="flex-1 min-w-0">ファイル名</div>
+                <div className="w-14 text-center">リスク</div>
+                <div className="w-12 text-right">スコア</div>
+                <div className="w-16 text-right">問題数</div>
+                <div className="w-5 flex-shrink-0" /> {/* Arrow spacer */}
+              </div>
+              <div className="divide-y divide-[#e8eaed]">
+                {files.map((file) => (
+                  <FileRow key={file.id} file={file} onClick={() => onFileClick(file)} />
+                ))}
+              </div>
+            </>
           )}
 
           {/* Drive Link */}
@@ -906,7 +1033,7 @@ export function FilesPage() {
   });
 
   // Get files
-  const { data: filesData, isLoading, isError, isFetching } = useQuery({
+  const { data: filesData, isLoading, isError, error: filesError, isFetching } = useQuery({
     queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, debouncedSearch, sortBy, sortOrder, offset],
     queryFn: () =>
       scanApi.getFiles(scanId!, {
@@ -922,7 +1049,7 @@ export function FilesPage() {
   });
 
   // Get folders
-  const { data: foldersData, isLoading: isFoldersLoading, isError: isFoldersError } = useQuery({
+  const { data: foldersData, isLoading: isFoldersLoading, isError: isFoldersError, error: foldersError } = useQuery({
     queryKey: ['scanFolders', scanId, riskLevelFilter, folderOffset],
     queryFn: () =>
       scanApi.getFolders(scanId!, {
@@ -931,6 +1058,14 @@ export function FilesPage() {
         minRiskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
       }),
     enabled: !!scanId && viewMode === 'folders',
+  });
+
+  // Fetch target folder by ID when navigating from modal
+  const targetFolderInCurrentPage = foldersData?.folders?.some(f => f.id === expandedFolderId);
+  const { data: targetFolderData, isLoading: isTargetFolderLoading } = useQuery({
+    queryKey: ['scanFolder', scanId, expandedFolderId],
+    queryFn: () => scanApi.getFolderById(scanId!, expandedFolderId!),
+    enabled: !!scanId && !!expandedFolderId && viewMode === 'folders' && !targetFolderInCurrentPage,
   });
 
   const scan = scanData?.scan;
@@ -1418,10 +1553,31 @@ export function FilesPage() {
                 </div>
               ) : isError ? (
                 <div className="p-8 text-center">
-                  <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                  </svg>
-                  <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+                  {isAuthenticationError(filesError) ? (
+                    <>
+                      <svg className="w-8 h-8 text-[#e37400] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
+                      </svg>
+                      <p className="mt-2 text-sm text-[#e37400] font-medium">セッションの有効期限が切れました</p>
+                      <p className="mt-1 text-xs text-[#5f6368]">Google認証が必要です。再度ログインしてください。</p>
+                      <a
+                        href={authApi.getLoginUrl()}
+                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#1a73e8] text-white text-sm font-medium rounded-lg hover:bg-[#1557b0] transition-colors"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                        </svg>
+                        再ログイン
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                      </svg>
+                      <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+                    </>
+                  )}
                 </div>
               ) : files.length === 0 ? (
                 <div className="p-8 text-center">
@@ -1494,10 +1650,31 @@ export function FilesPage() {
               </div>
             ) : isFoldersError ? (
               <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
-                <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                </svg>
-                <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+                {isAuthenticationError(foldersError) ? (
+                  <>
+                    <svg className="w-8 h-8 text-[#e37400] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
+                    </svg>
+                    <p className="mt-2 text-sm text-[#e37400] font-medium">セッションの有効期限が切れました</p>
+                    <p className="mt-1 text-xs text-[#5f6368]">Google認証が必要です。再度ログインしてください。</p>
+                    <a
+                      href={authApi.getLoginUrl()}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#1a73e8] text-white text-sm font-medium rounded-lg hover:bg-[#1557b0] transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                      </svg>
+                      再ログイン
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-8 h-8 text-[#d93025] mx-auto" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                    </svg>
+                    <p className="mt-2 text-sm text-[#d93025]">データの取得に失敗しました</p>
+                  </>
+                )}
               </div>
             ) : folders.length === 0 ? (
               <div className="p-8 text-center bg-white rounded-xl border border-[#dadce0]">
@@ -1508,6 +1685,28 @@ export function FilesPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Target folder from navigation (not in current page) */}
+                {targetFolderData?.folder && !targetFolderInCurrentPage && (
+                  <div className="relative">
+                    <div className="absolute -left-2 top-0 bottom-0 w-1 bg-[#1a73e8] rounded-full" />
+                    <FolderCard
+                      key={targetFolderData.folder.id}
+                      folder={targetFolderData.folder}
+                      isExpanded={expandedFolderId === targetFolderData.folder.id}
+                      onToggle={() => setExpandedFolderId(
+                        expandedFolderId === targetFolderData.folder.id ? null : targetFolderData.folder.id
+                      )}
+                      onFileClick={setSelectedFile}
+                      scanId={scanId!}
+                      onNavigateToFolder={setExpandedFolderId}
+                    />
+                  </div>
+                )}
+                {isTargetFolderLoading && expandedFolderId && !targetFolderInCurrentPage && (
+                  <div className="bg-white rounded-xl border border-[#dadce0] p-4 animate-pulse">
+                    <div className="h-6 bg-[#e8eaed] rounded w-1/3"></div>
+                  </div>
+                )}
                 {folders.map((folder) => (
                   <FolderCard
                     key={folder.id}
@@ -1518,6 +1717,7 @@ export function FilesPage() {
                     )}
                     onFileClick={setSelectedFile}
                     scanId={scanId!}
+                    onNavigateToFolder={setExpandedFolderId}
                   />
                 ))}
               </div>
@@ -1558,6 +1758,11 @@ export function FilesPage() {
           onClose={() => setSelectedFile(null)}
           scanId={scanId}
           onPermissionChange={() => setSelectedFile(null)}
+          onNavigateToFolder={(folderId) => {
+            setSelectedFile(null);
+            setViewMode('folders');
+            setExpandedFolderId(folderId);
+          }}
         />
       )}
 

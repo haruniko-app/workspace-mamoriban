@@ -107,12 +107,16 @@ function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
               ? scan.phase === 'counting'
                 ? 'Google Drive内のファイルを数えています...'
                 : scan.phase === 'scanning'
-                ? `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+                ? scan.totalFiles > 0
+                  ? `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+                  : `${scan.processedFiles.toLocaleString()}件のファイルを処理済み`
                 : scan.phase === 'resolving'
                 ? 'フォルダ名を取得しています...'
                 : scan.phase === 'saving'
                 ? 'スキャン結果をデータベースに保存しています...'
-                : `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+                : scan.totalFiles > 0
+                  ? `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件のファイルを処理中`
+                  : `${scan.processedFiles.toLocaleString()}件のファイルを処理済み`
               : scan.status === 'running' && isTimedOut
               ? 'スキャンが長時間完了しませんでした。新しいスキャンを開始してください。'
               : scan.status === 'completed'
@@ -169,21 +173,29 @@ function ScanProgress({ scan, onReset }: { scan: Scan; onReset: () => void }) {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-[#5f6368]">処理中のファイル</span>
                 <span className="text-sm font-medium text-[#1a73e8]">
-                  {scan.processedFiles.toLocaleString()} / {scan.totalFiles.toLocaleString()}件
+                  {scan.totalFiles > 0
+                    ? `${scan.processedFiles.toLocaleString()} / ${scan.totalFiles.toLocaleString()}件`
+                    : `${scan.processedFiles.toLocaleString()}件 処理済み`
+                  }
                 </span>
               </div>
               <div className="h-2 bg-[#e8eaed] rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#1a73e8] rounded-full transition-all duration-500"
-                  style={{
-                    width: scan.totalFiles > 0
-                      ? `${Math.min((scan.processedFiles / scan.totalFiles) * 100, 100)}%`
-                      : '0%'
-                  }}
-                />
+                {scan.totalFiles > 0 ? (
+                  <div
+                    className="h-full bg-[#1a73e8] rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min((scan.processedFiles / scan.totalFiles) * 100, 100)}%`
+                    }}
+                  />
+                ) : (
+                  <div className="h-full bg-[#1a73e8] rounded-full animate-pulse w-full opacity-60" />
+                )}
               </div>
               <p className="text-xs text-[#5f6368] mt-2">
-                共有設定を確認しています... ({Math.round((scan.processedFiles / scan.totalFiles) * 100)}% 完了)
+                {scan.totalFiles > 0
+                  ? `共有設定を確認しています... (${Math.round((scan.processedFiles / scan.totalFiles) * 100)}% 完了)`
+                  : '共有設定を確認しています...'
+                }
               </p>
             </>
           )}
@@ -311,6 +323,7 @@ export function ScanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [scanType, setScanType] = useState<'full' | 'incremental'>('full');
 
   // Get scanId from URL query params for browser back button support
   const currentScanId = searchParams.get('id');
@@ -329,9 +342,20 @@ export function ScanPage() {
     queryFn: stripeApi.getSubscription,
   });
 
+  // Get scan history to check if incremental scan is available
+  const { data: historyData } = useQuery({
+    queryKey: ['scanHistory', 1, 0],
+    queryFn: () => scanApi.getHistory(10, 0),
+  });
+
+  // Check if there's a completed scan with change token for incremental scan
+  const hasIncrementalBase = historyData?.scans.some(
+    (s) => s.status === 'completed' && s.driveChangeToken
+  );
+
   // Start scan mutation
   const startScanMutation = useMutation({
-    mutationFn: scanApi.start,
+    mutationFn: (options?: { scanType?: 'full' | 'incremental' }) => scanApi.start(options),
     onSuccess: (data) => {
       setCurrentScanId(data.scanId);
     },
@@ -356,7 +380,7 @@ export function ScanPage() {
   }, [scanData?.scan.status, queryClient]);
 
   const handleStartScan = () => {
-    startScanMutation.mutate();
+    startScanMutation.mutate({ scanType });
   };
 
   return (
@@ -386,6 +410,56 @@ export function ScanPage() {
                 Google Drive 内のファイルの共有設定をスキャンし、
                 情報漏洩リスクを検出します
               </p>
+
+              {/* Scan Type Selection */}
+              <div className="mb-6">
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setScanType('full')}
+                    className={`flex-1 max-w-[200px] p-4 rounded-xl border-2 transition-all ${
+                      scanType === 'full'
+                        ? 'border-[#1a73e8] bg-[#e8f0fe]'
+                        : 'border-[#dadce0] hover:border-[#1a73e8]/50'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <svg className={`w-8 h-8 ${scanType === 'full' ? 'text-[#1a73e8]' : 'text-[#5f6368]'}`} viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+                        <path d="M7 12h2v5H7zm4-3h2v8h-2zm4-3h2v11h-2z"/>
+                      </svg>
+                      <span className={`text-sm font-medium ${scanType === 'full' ? 'text-[#1a73e8]' : 'text-[#202124]'}`}>
+                        フルスキャン
+                      </span>
+                      <span className="text-xs text-[#5f6368]">
+                        全ファイルをスキャン
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setScanType('incremental')}
+                    disabled={!hasIncrementalBase}
+                    className={`flex-1 max-w-[200px] p-4 rounded-xl border-2 transition-all ${
+                      !hasIncrementalBase
+                        ? 'border-[#dadce0] opacity-50 cursor-not-allowed'
+                        : scanType === 'incremental'
+                        ? 'border-[#1a73e8] bg-[#e8f0fe]'
+                        : 'border-[#dadce0] hover:border-[#1a73e8]/50'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <svg className={`w-8 h-8 ${scanType === 'incremental' && hasIncrementalBase ? 'text-[#1a73e8]' : 'text-[#5f6368]'}`} viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                      </svg>
+                      <span className={`text-sm font-medium ${scanType === 'incremental' && hasIncrementalBase ? 'text-[#1a73e8]' : 'text-[#202124]'}`}>
+                        差分スキャン
+                      </span>
+                      <span className="text-xs text-[#5f6368]">
+                        {hasIncrementalBase ? '変更ファイルのみ (高速)' : '要フルスキャン'}
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              </div>
 
               {/* Plan Limit Display */}
               {subscriptionData && (

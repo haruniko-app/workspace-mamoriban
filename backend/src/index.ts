@@ -18,6 +18,9 @@ import reportRoutes from './routes/reports.js';
 import notificationRoutes from './routes/notifications.js';
 import delegationRoutes from './routes/delegation.js';
 
+// Services
+import { ScanService } from './services/firestore.js';
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -82,8 +85,15 @@ app.use('/api/notifications', notificationRoutes);
 // Domain-Wide Delegation routes
 app.use('/api/delegation', delegationRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🛡️ Workspace守り番 Backend running on port ${PORT}`);
+
+  // サーバー起動時に放置された「running」状態のスキャンをクリーンアップ
+  try {
+    await ScanService.cleanupOrphanedScans();
+  } catch (error) {
+    console.error('Failed to cleanup orphaned scans:', error);
+  }
 });
 
 export default app;

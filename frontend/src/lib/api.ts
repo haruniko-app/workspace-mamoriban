@@ -1,5 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+// カスタムエラークラス: 認証エラー（トークン期限切れなど）
+export class AuthenticationError extends Error {
+  constructor(message: string = 'セッションの有効期限が切れました。再度ログインしてください。') {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+
+// 認証エラーかどうかを判定するヘルパー関数
+export function isAuthenticationError(error: unknown): error is AuthenticationError {
+  return error instanceof AuthenticationError;
+}
+
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
 }
@@ -23,6 +36,12 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
   });
 
   if (!response.ok) {
+    // 401 Unauthorized: 認証エラー（トークン期限切れなど）
+    if (response.status === 401) {
+      const error = await response.json().catch(() => ({ error: 'Unauthorized' }));
+      throw new AuthenticationError(error.error || 'セッションの有効期限が切れました。再度ログインしてください。');
+    }
+
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP error ${response.status}`);
   }
@@ -86,7 +105,13 @@ export const organizationApi = {
 
 // Scan API
 export const scanApi = {
-  start: () => api.post<{ scanId: string; status: string; message: string }>('/api/scan/start'),
+  start: (options?: { scanType?: 'full' | 'incremental'; baseScanId?: string }) =>
+    api.post<{ scanId: string; status: string; scanType: 'full' | 'incremental'; baseScanId: string | null; message: string }>(
+      '/api/scan/start',
+      options || {}
+    ),
+  cancel: (scanId: string) =>
+    api.post<{ success: boolean; message: string; scanId: string }>(`/api/scan/${scanId}/cancel`),
   getById: (scanId: string) => api.get<{ scan: Scan }>(`/api/scan/${scanId}`),
   getHistory: (limit = 10, offset = 0) =>
     api.get<{ scans: Scan[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean } }>(
@@ -124,6 +149,8 @@ export const scanApi = {
     if (options?.minRiskLevel) params.minRiskLevel = options.minRiskLevel;
     return api.get<{ folders: FolderSummary[]; pagination: Pagination }>(`/api/scan/${scanId}/folders`, { params });
   },
+  getFolderById: (scanId: string, folderId: string) =>
+    api.get<{ folder: FolderSummary }>(`/api/scan/${scanId}/folder/${folderId}`),
   getFolderFiles: (scanId: string, folderId: string, options?: {
     limit?: number;
     offset?: number;
@@ -137,6 +164,8 @@ export const scanApi = {
     if (options?.sortOrder) params.sortOrder = options.sortOrder;
     return api.get<{ files: ScannedFile[]; pagination: Pagination }>(`/api/scan/${scanId}/folders/${folderId}/files`, { params });
   },
+  getSubfolders: (scanId: string, folderId: string) =>
+    api.get<{ subfolders: FolderSummary[] }>(`/api/scan/${scanId}/folders/${folderId}/subfolders`),
   // Permission management
   deletePermission: (scanId: string, fileId: string, permissionId: string) =>
     api.delete<{ success: boolean; message: string; fileId: string; permissionId: string }>(
@@ -262,10 +291,15 @@ export interface Scan {
   userEmail: string;
   userName: string;
   visibility: 'private' | 'organization';
-  status: 'running' | 'completed' | 'failed';
+  scanType: 'full' | 'incremental';
+  baseScanId: string | null;
+  driveChangeToken: string | null;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
   phase: 'counting' | 'scanning' | 'resolving' | 'saving' | 'done';
   totalFiles: number;
   processedFiles: number;
+  scannedNewFiles: number;
+  copiedFiles: number;
   riskySummary: {
     critical: number;
     high: number;
@@ -325,6 +359,7 @@ export interface FolderPathItem {
 export interface FolderSummary {
   id: string;
   name: string;
+  parentFolderId: string | null;
   fileCount: number;
   riskySummary: {
     critical: number;
@@ -531,7 +566,7 @@ export interface UserScanSummary {
   userName: string;
   userRole: 'owner' | 'admin' | 'member';
   lastScanAt: string | null;
-  lastScanStatus: 'running' | 'completed' | 'failed' | null;
+  lastScanStatus: 'running' | 'completed' | 'failed' | 'cancelled' | null;
   riskySummary: {
     critical: number;
     high: number;

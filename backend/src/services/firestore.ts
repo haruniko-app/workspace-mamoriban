@@ -413,16 +413,32 @@ export const ScanService = {
       riskySummary: Scan['riskySummary'];
       phase?: Scan['phase'];
       processedFiles?: number;
+      driveChangeToken?: string | null;
+      scannedNewFiles?: number;
+      copiedFiles?: number;
     }
   ): Promise<void> {
-    await scansRef.doc(id).update({
+    const updateData: Partial<Scan> & { completedAt: Date } = {
       status: 'completed',
       totalFiles: result.totalFiles,
       riskySummary: result.riskySummary,
       phase: result.phase || 'done',
       processedFiles: result.processedFiles ?? result.totalFiles,
       completedAt: new Date(),
-    });
+    };
+
+    // 差分スキャン関連フィールド
+    if (result.driveChangeToken !== undefined) {
+      updateData.driveChangeToken = result.driveChangeToken;
+    }
+    if (result.scannedNewFiles !== undefined) {
+      updateData.scannedNewFiles = result.scannedNewFiles;
+    }
+    if (result.copiedFiles !== undefined) {
+      updateData.copiedFiles = result.copiedFiles;
+    }
+
+    await scansRef.doc(id).update(updateData);
   },
 
   async fail(id: string, errorMessage: string): Promise<void> {
@@ -431,6 +447,50 @@ export const ScanService = {
       errorMessage,
       completedAt: new Date(),
     });
+  },
+
+  async cancel(id: string): Promise<boolean> {
+    const scan = await this.getById(id);
+    if (!scan) return false;
+    if (scan.status !== 'running') return false;
+
+    await scansRef.doc(id).update({
+      status: 'cancelled',
+      errorMessage: 'スキャンがキャンセルされました',
+      completedAt: new Date(),
+    });
+    return true;
+  },
+
+  /**
+   * サーバー起動時に放置された「running」状態のスキャンをクリーンアップ
+   * サーバー再起動によって中断されたスキャンを検出して失敗としてマークする
+   */
+  async cleanupOrphanedScans(): Promise<number> {
+    const snapshot = await scansRef.where('status', '==', 'running').get();
+
+    if (snapshot.empty) {
+      return 0;
+    }
+
+    const batch = firestore.batch();
+    let count = 0;
+
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, {
+        status: 'failed',
+        errorMessage: 'サーバー再起動により中断されました',
+        completedAt: new Date(),
+      });
+      count++;
+    }
+
+    if (count > 0) {
+      await batch.commit();
+      console.log(`Cleaned up ${count} orphaned running scan(s)`);
+    }
+
+    return count;
   },
 };
 
@@ -443,7 +503,7 @@ export interface UserScanSummary {
   userName: string;
   userRole: 'owner' | 'admin' | 'member';
   lastScanAt: Date | string | null;
-  lastScanStatus: 'running' | 'completed' | 'failed' | null;
+  lastScanStatus: 'running' | 'completed' | 'failed' | 'cancelled' | null;
   riskySummary: {
     critical: number;
     high: number;
@@ -475,6 +535,16 @@ export const ScannedFileService = {
     }
 
     await batch.commit();
+  },
+
+  /**
+   * スキャンの全ファイルを取得（差分スキャン用）
+   * 注意: 大量ファイルがある場合はメモリを消費するため、差分スキャンでのみ使用
+   */
+  async getAllFiles(scanId: string): Promise<ScannedFile[]> {
+    const filesRef = scansRef.doc(scanId).collection('files');
+    const snapshot = await filesRef.get();
+    return snapshot.docs.map((doc) => doc.data() as ScannedFile);
   },
 
   /**
@@ -644,7 +714,7 @@ export const ScannedFileService = {
   },
 
   /**
-   * フォルダごとにファイルを集計
+   * フォルダごとにファイルを集計（事前計算済みサマリーを優先使用）
    */
   async getByFolder(
     scanId: string,
@@ -658,6 +728,15 @@ export const ScannedFileService = {
     total: number;
   }> {
     const { limit = 20, offset = 0, minRiskLevel } = options;
+
+    // まず事前計算済みサマリーを試す
+    const precomputed = await this.getFolderSummaries(scanId, options);
+    if (precomputed.precomputed) {
+      return { folders: precomputed.folders, total: precomputed.total };
+    }
+
+    // 事前計算済みサマリーがない場合はフォールバック（既存スキャン用）
+    console.log(`Scan ${scanId}: No precomputed folder summaries, falling back to legacy method`);
     const filesRef = scansRef.doc(scanId).collection('files');
 
     // リスクレベルに応じてフィルタ
@@ -718,6 +797,7 @@ export const ScannedFileService = {
       folders.push({
         id: folderId,
         name: folder.name,
+        parentFolderId: null, // フォールバック用のため親フォルダIDは取得しない
         fileCount: folder.files.length,
         riskySummary,
         highestRiskLevel,
@@ -754,17 +834,16 @@ export const ScannedFileService = {
     // フォルダIDでフィルタ
     const isRoot = folderId === 'root';
 
-    // Firestoreクエリ（rootの場合は全件取得してフィルタ、そうでない場合は直接クエリ）
-    // Note: Firestoreはnullと未定義を区別するため、rootの場合は全件取得後にフィルタ
     let files: ScannedFile[];
     let total: number;
 
     if (isRoot) {
       // rootの場合: parentFolderIdがnull、undefined、または存在しないファイルを取得
+      // Firestoreは where('field', '==', null) でフィールドが存在しない場合には一致しないため、
+      // 全ファイルを取得してメモリでフィルタリングする
       const snapshot = await filesRef.get();
-      files = snapshot.docs
-        .map((doc) => doc.data() as ScannedFile)
-        .filter((file) => !file.parentFolderId);
+      const allFiles = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+      files = allFiles.filter((file) => !file.parentFolderId);
       total = files.length;
     } else {
       const query = filesRef.where('parentFolderId', '==', folderId);
@@ -800,6 +879,196 @@ export const ScannedFileService = {
     const fileRef = scansRef.doc(scanId).collection('files').doc(fileId);
     await fileRef.update({ permissions });
   },
+
+  /**
+   * フォルダサマリーを計算して保存（スキャン完了時に呼び出す）
+   * @param scanId スキャンID
+   * @param folderInfoMap フォルダ情報マップ（親フォルダID解決用）
+   * @param preloadedFiles 事前に取得済みのファイル配列（省略時はFirestoreから取得）
+   */
+  async calculateAndSaveFolderSummaries(
+    scanId: string,
+    folderInfoMap?: Map<string, { name: string; parentFolderId: string | null }>,
+    preloadedFiles?: Omit<ScannedFile, 'scanId' | 'createdAt'>[]
+  ): Promise<number> {
+    const summariesRef = scansRef.doc(scanId).collection('folderSummaries');
+
+    // ファイル取得: preloadedFilesがあればそれを使用、なければFirestoreから取得
+    let files: (ScannedFile | Omit<ScannedFile, 'scanId' | 'createdAt'>)[];
+    if (preloadedFiles) {
+      console.log(`Using ${preloadedFiles.length} preloaded files for folder summary calculation`);
+      files = preloadedFiles;
+    } else {
+      console.log('Fetching files from Firestore for folder summary calculation');
+      const filesRef = scansRef.doc(scanId).collection('files');
+      const snapshot = await filesRef.get();
+      files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+    }
+
+    // フォルダごとにグループ化
+    type FileData = ScannedFile | Omit<ScannedFile, 'scanId' | 'createdAt'>;
+    const folderMap = new Map<string, {
+      id: string;
+      name: string;
+      parentFolderId: string | null;
+      files: FileData[];
+    }>();
+
+    for (const file of files) {
+      const folderId = file.parentFolderId || 'root';
+      const folderName = file.parentFolderName || 'マイドライブ';
+      // フォルダ情報マップから親フォルダIDを取得
+      const folderInfo = folderInfoMap?.get(folderId);
+      const parentFolderId = folderInfo?.parentFolderId || null;
+
+      if (!folderMap.has(folderId)) {
+        folderMap.set(folderId, {
+          id: folderId,
+          name: folderName,
+          parentFolderId,
+          files: [],
+        });
+      }
+      folderMap.get(folderId)!.files.push(file);
+    }
+
+    // バッチ書き込み（500件ずつ）
+    const BATCH_SIZE = 500;
+    const folderEntries = Array.from(folderMap.entries());
+
+    for (let i = 0; i < folderEntries.length; i += BATCH_SIZE) {
+      const batch = firestore.batch();
+      const chunk = folderEntries.slice(i, i + BATCH_SIZE);
+
+      for (const [folderId, folder] of chunk) {
+        const riskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+        let totalRiskScore = 0;
+
+        for (const file of folder.files) {
+          riskySummary[file.riskLevel]++;
+          totalRiskScore += file.riskScore;
+        }
+
+        // 最高リスクレベルを決定
+        let highestRiskLevel: 'critical' | 'high' | 'medium' | 'low' = 'low';
+        if (riskySummary.critical > 0) highestRiskLevel = 'critical';
+        else if (riskySummary.high > 0) highestRiskLevel = 'high';
+        else if (riskySummary.medium > 0) highestRiskLevel = 'medium';
+
+        const summary: FolderSummary = {
+          id: folderId,
+          name: folder.name,
+          parentFolderId: folder.parentFolderId,
+          fileCount: folder.files.length,
+          riskySummary,
+          highestRiskLevel,
+          totalRiskScore,
+        };
+
+        batch.set(summariesRef.doc(folderId), summary);
+      }
+
+      await batch.commit();
+    }
+
+    return folderMap.size;
+  },
+
+  /**
+   * 事前計算済みフォルダサマリーを取得
+   */
+  async getFolderSummaries(
+    scanId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      minRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+    } = {}
+  ): Promise<{
+    folders: FolderSummary[];
+    total: number;
+    precomputed: boolean;
+  }> {
+    const { limit = 20, offset = 0, minRiskLevel } = options;
+    const summariesRef = scansRef.doc(scanId).collection('folderSummaries');
+
+    // 事前計算済みサマリーが存在するか確認
+    const countSnapshot = await summariesRef.count().get();
+    const totalCount = countSnapshot.data().count;
+
+    if (totalCount === 0) {
+      // 事前計算済みサマリーがない場合はフォールバック
+      return { folders: [], total: 0, precomputed: false };
+    }
+
+    // クエリを構築
+    let query: FirebaseFirestore.Query = summariesRef;
+
+    // リスクレベルでフィルタ
+    if (minRiskLevel) {
+      const riskLevels = getRiskLevelsAbove(minRiskLevel);
+      if (riskLevels.length > 0) {
+        query = query.where('highestRiskLevel', 'in', riskLevels);
+      }
+    }
+
+    // totalRiskScoreで降順ソート
+    query = query.orderBy('totalRiskScore', 'desc');
+
+    // カウント
+    const filteredCountSnapshot = await query.count().get();
+    const total = filteredCountSnapshot.data().count;
+
+    // ページネーション
+    query = query.offset(offset).limit(limit);
+    const snapshot = await query.get();
+
+    const folders = snapshot.docs.map((doc) => doc.data() as FolderSummary);
+
+    return { folders, total, precomputed: true };
+  },
+
+  /**
+   * フォルダサマリーが存在するか確認
+   */
+  async hasFolderSummaries(scanId: string): Promise<boolean> {
+    const summariesRef = scansRef.doc(scanId).collection('folderSummaries');
+    const countSnapshot = await summariesRef.count().get();
+    return countSnapshot.data().count > 0;
+  },
+
+  /**
+   * 単一フォルダサマリーをIDで取得
+   */
+  async getFolderSummaryById(
+    scanId: string,
+    folderId: string
+  ): Promise<FolderSummary | null> {
+    const summariesRef = scansRef.doc(scanId).collection('folderSummaries');
+    const doc = await summariesRef.doc(folderId).get();
+
+    if (!doc.exists) {
+      return null;
+    }
+
+    return doc.data() as FolderSummary;
+  },
+
+  /**
+   * 指定されたフォルダの直接の子サブフォルダを取得
+   */
+  async getSubfolders(
+    scanId: string,
+    parentFolderId: string
+  ): Promise<FolderSummary[]> {
+    const summariesRef = scansRef.doc(scanId).collection('folderSummaries');
+    const query = summariesRef
+      .where('parentFolderId', '==', parentFolderId)
+      .orderBy('totalRiskScore', 'desc');
+
+    const snapshot = await query.get();
+    return snapshot.docs.map((doc) => doc.data() as FolderSummary);
+  },
 };
 
 /**
@@ -817,6 +1086,7 @@ function getRiskLevelsAbove(minLevel: 'critical' | 'high' | 'medium' | 'low'): s
 export interface FolderSummary {
   id: string;
   name: string;
+  parentFolderId: string | null;  // 親フォルダID（サブフォルダ取得用）
   fileCount: number;
   riskySummary: {
     critical: number;

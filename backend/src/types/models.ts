@@ -82,11 +82,18 @@ export interface Scan {
   // - private: 本人 + admin/owner が閲覧可能
   // - organization: 組織メンバー全員が閲覧可能
 
+  // スキャンタイプ（差分スキャン対応）
+  scanType: 'full' | 'incremental';        // full: フルスキャン, incremental: 差分スキャン
+  baseScanId: string | null;               // 差分スキャンのベースとなるスキャンID
+  driveChangeToken: string | null;         // 次回差分スキャン用のGoogle Driveチェンジトークン
+
   // スキャン結果サマリー
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
   phase: 'counting' | 'scanning' | 'resolving' | 'saving' | 'done';  // スキャンフェーズ
   totalFiles: number;              // 総ファイル数（カウント完了後に確定）
   processedFiles: number;          // 処理済みファイル数
+  scannedNewFiles: number;         // 新規/変更スキャンしたファイル数（差分スキャン用）
+  copiedFiles: number;             // 前回スキャンからコピーしたファイル数（差分スキャン用）
   riskySummary: {
     critical: number;              // 80-100点
     high: number;                  // 60-79点
