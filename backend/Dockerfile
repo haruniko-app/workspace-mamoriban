@@ -3,7 +3,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -15,9 +15,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/fonts ./fonts
 
 EXPOSE 8080
 
