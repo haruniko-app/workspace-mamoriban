@@ -8,19 +8,17 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Use unprivileged nginx image for Cloud Run compatibility
-FROM nginxinc/nginx-unprivileged:alpine
+FROM node:20-slim AS runner
 
-# Copy built files
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy nginx config template
-COPY nginx.conf /etc/nginx/nginx.conf.template
+# Copy built files and server
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.js ./server.js
 
-# Set default port (Cloud Run will override via PORT env var)
 ENV PORT=8080
+ENV NODE_ENV=production
 
 EXPOSE 8080
 
-# Process template with envsubst and start nginx
-CMD /bin/sh -c "envsubst '\$PORT' < /etc/nginx/nginx.conf.template > /tmp/default.conf && cp /tmp/default.conf /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+CMD ["node", "server.js"]
