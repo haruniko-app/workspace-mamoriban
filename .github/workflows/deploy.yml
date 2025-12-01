@@ -33,6 +33,18 @@ jobs:
           docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.BACKEND_SERVICE }}:${{ github.sha }} ./backend
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.BACKEND_SERVICE }}:${{ github.sha }}
 
+      - name: Get Frontend URL
+        id: frontend-url
+        run: |
+          FRONTEND_URL=$(gcloud run services describe ${{ env.FRONTEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)" 2>/dev/null || echo "https://${{ env.FRONTEND_SERVICE }}-qnmzyz2bca-an.a.run.app")
+          echo "url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Get Backend URL
+        id: backend-url
+        run: |
+          BACKEND_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)" 2>/dev/null || echo "https://${{ env.BACKEND_SERVICE }}-qnmzyz2bca-an.a.run.app")
+          echo "url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy ${{ env.BACKEND_SERVICE }} \
@@ -40,7 +52,7 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "NODE_ENV=production"
+            --set-env-vars "NODE_ENV=production,GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},FRONTEND_URL=${{ steps.frontend-url.outputs.url }},BACKEND_URL=${{ steps.backend-url.outputs.url }},SESSION_SECRET=${{ secrets.SESSION_SECRET }},GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }},STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }},STRIPE_BASIC_PRICE_ID=${{ secrets.STRIPE_BASIC_PRICE_ID }},STRIPE_PRO_PRICE_ID=${{ secrets.STRIPE_PRO_PRICE_ID }},STRIPE_ENTERPRISE_PRICE_ID=${{ secrets.STRIPE_ENTERPRISE_PRICE_ID }}"
 
   deploy-frontend:
     runs-on: ubuntu-latest
