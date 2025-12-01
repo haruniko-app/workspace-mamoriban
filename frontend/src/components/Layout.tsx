@@ -140,23 +140,15 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Logo - Google uses 40x40 product icon + 22px product name */}
           <Link to="/dashboard" className="flex items-center gap-2 pl-2 pr-4">
-            <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
-              <rect width="48" height="48" rx="12" fill="#1a73e8" />
-              <path
-                d="M24 10L14 16v12c0 7.2 4.3 13.8 10 15.5 5.7-1.7 10-8.3 10-15.5V16l-10-6z"
-                fill="white"
-              />
-              <path
-                d="M21 26l2.5 2.5 5-5"
-                stroke="#1a73e8"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="text-[22px] text-[#5f6368] tracking-[-0.01em] hidden sm:block whitespace-nowrap">
-              Workspace守り番
-            </span>
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div className="hidden sm:flex items-baseline gap-1">
+              <span className="text-[22px] text-gray-700">Workspace</span>
+              <span className="text-[22px] text-gray-700 font-normal">守り番</span>
+            </div>
           </Link>
         </div>
 
@@ -335,21 +327,15 @@ export function Layout({ children }: LayoutProps) {
             <aside className="fixed left-0 top-0 w-[280px] h-full bg-white z-50 lg:hidden shadow-2xl">
               <div className="flex items-center justify-between h-16 px-4 border-b border-[#dadce0]">
                 <div className="flex items-center gap-2">
-                  <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
-                    <rect width="48" height="48" rx="8" fill="#1a73e8" />
-                    <path
-                      d="M24 8L12 15v13c0 8.4 5.1 16.3 12 18.5 6.9-2.2 12-10.1 12-18.5V15l-12-7z"
-                      fill="white"
-                    />
-                    <path
-                      d="M20 24l3 3 6-6"
-                      stroke="#1a73e8"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="text-[18px] text-[#5f6368]">Workspace守り番</span>
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[18px] text-gray-700">Workspace</span>
+                    <span className="text-[18px] text-gray-700 font-normal">守り番</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
