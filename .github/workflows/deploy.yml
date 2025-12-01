@@ -59,9 +59,18 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
+      - name: Get Backend URL
+        id: backend-url
+        run: |
+          BACKEND_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)")
+          echo "url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
       - name: Build and Push Frontend
         run: |
-          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.FRONTEND_SERVICE }}:${{ github.sha }} ./frontend
+          docker build \
+            --build-arg VITE_API_URL=${{ steps.backend-url.outputs.url }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.FRONTEND_SERVICE }}:${{ github.sha }} \
+            ./frontend
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.FRONTEND_SERVICE }}:${{ github.sha }}
 
       - name: Deploy Frontend to Cloud Run
