@@ -142,11 +142,19 @@ export const scanApi = {
     limit?: number;
     offset?: number;
     minRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+    ownerType?: 'internal' | 'external';
+    search?: string;
+    sortBy?: 'riskScore' | 'name' | 'fileCount';
+    sortOrder?: 'asc' | 'desc';
   }) => {
     const params: Record<string, string> = {};
     if (options?.limit) params.limit = String(options.limit);
     if (options?.offset) params.offset = String(options.offset);
     if (options?.minRiskLevel) params.minRiskLevel = options.minRiskLevel;
+    if (options?.ownerType) params.ownerType = options.ownerType;
+    if (options?.search) params.search = options.search;
+    if (options?.sortBy) params.sortBy = options.sortBy;
+    if (options?.sortOrder) params.sortOrder = options.sortOrder;
     return api.get<{ folders: FolderSummary[]; pagination: Pagination }>(`/api/scan/${scanId}/folders`, { params });
   },
   getFolderById: (scanId: string, folderId: string) =>

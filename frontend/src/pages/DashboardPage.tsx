@@ -182,6 +182,9 @@ export function DashboardPage() {
   const handleScanClick = (scan: Scan) => {
     if (scan.status === 'completed') {
       navigate(`/scan/${scan.id}/files`);
+    } else if (scan.status === 'running') {
+      // スキャン中の場合はプログレス画面に遷移
+      navigate(`/scan?id=${scan.id}`);
     }
   };
 

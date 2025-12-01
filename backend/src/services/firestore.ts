@@ -722,21 +722,89 @@ export const ScannedFileService = {
       limit?: number;
       offset?: number;
       minRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+      ownerType?: 'internal' | 'external';
+      search?: string;
+      sortBy?: 'riskScore' | 'name' | 'fileCount';
+      sortOrder?: 'asc' | 'desc';
     } = {}
   ): Promise<{
     folders: FolderSummary[];
     total: number;
   }> {
-    const { limit = 20, offset = 0, minRiskLevel } = options;
+    const { limit = 20, offset = 0, minRiskLevel, ownerType, search, sortBy = 'riskScore', sortOrder = 'desc' } = options;
 
-    // まず事前計算済みサマリーを試す
-    const precomputed = await this.getFolderSummaries(scanId, options);
-    if (precomputed.precomputed) {
-      return { folders: precomputed.folders, total: precomputed.total };
+    // ownerType や search フィルターがある場合は事前計算済みサマリーを使用できない
+    // ファイルを直接スキャンしてフィルター適用後に集計する
+    const hasAdvancedFilters = ownerType || search;
+
+    // リスクレベルを数値に変換（ソート用）
+    const riskLevelPriority = (level: string): number => {
+      switch (level) {
+        case 'critical': return 4;
+        case 'high': return 3;
+        case 'medium': return 2;
+        case 'low': return 1;
+        default: return 0;
+      }
+    };
+
+    if (!hasAdvancedFilters) {
+      // まず事前計算済みサマリーを試す（全件取得してソート・ページネーションはJS側で行う）
+      const precomputed = await this.getFolderSummaries(scanId, { limit: 10000, offset: 0, minRiskLevel });
+      if (precomputed.precomputed) {
+        // ソートを適用
+        let folders = [...precomputed.folders];
+        folders.sort((a, b) => {
+          let comparison = 0;
+          switch (sortBy) {
+            case 'name':
+              comparison = a.name.localeCompare(b.name, 'ja');
+              break;
+            case 'fileCount':
+              comparison = a.fileCount - b.fileCount;
+              break;
+            case 'riskScore':
+            default:
+              // まず最高リスクレベルでソート
+              const levelDiff = riskLevelPriority(a.highestRiskLevel) - riskLevelPriority(b.highestRiskLevel);
+              if (levelDiff !== 0) {
+                comparison = levelDiff;
+              } else {
+                // 同じリスクレベル内では、緊急→高→中→低の順でファイル数でソート
+                const criticalDiff = a.riskySummary.critical - b.riskySummary.critical;
+                if (criticalDiff !== 0) {
+                  comparison = criticalDiff;
+                } else {
+                  const highDiff = a.riskySummary.high - b.riskySummary.high;
+                  if (highDiff !== 0) {
+                    comparison = highDiff;
+                  } else {
+                    const mediumDiff = a.riskySummary.medium - b.riskySummary.medium;
+                    if (mediumDiff !== 0) {
+                      comparison = mediumDiff;
+                    } else {
+                      comparison = a.riskySummary.low - b.riskySummary.low;
+                    }
+                  }
+                }
+              }
+              break;
+          }
+          return sortOrder === 'desc' ? -comparison : comparison;
+        });
+        // ページネーション
+        const total = folders.length;
+        const paginatedFolders = folders.slice(offset, offset + limit);
+        return { folders: paginatedFolders, total };
+      }
     }
 
-    // 事前計算済みサマリーがない場合はフォールバック（既存スキャン用）
-    console.log(`Scan ${scanId}: No precomputed folder summaries, falling back to legacy method`);
+    // 事前計算済みサマリーがない場合、またはフィルターがある場合はフォールバック
+    if (hasAdvancedFilters) {
+      console.log(`Scan ${scanId}: Using file-based folder calculation due to advanced filters (ownerType=${ownerType}, search=${search})`);
+    } else {
+      console.log(`Scan ${scanId}: No precomputed folder summaries, falling back to legacy method`);
+    }
     const filesRef = scansRef.doc(scanId).collection('files');
 
     // リスクレベルに応じてフィルタ
@@ -750,7 +818,23 @@ export const ScannedFileService = {
 
     // 全ファイルを取得してメモリ上でグループ化
     const snapshot = await query.get();
-    const files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+    let files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
+
+    // ownerType フィルター適用
+    if (ownerType === 'internal') {
+      files = files.filter(f => f.isInternalOwner);
+    } else if (ownerType === 'external') {
+      files = files.filter(f => !f.isInternalOwner);
+    }
+
+    // search フィルター適用
+    if (search) {
+      const searchLower = search.toLowerCase();
+      files = files.filter(f =>
+        f.name.toLowerCase().includes(searchLower) ||
+        f.ownerName?.toLowerCase().includes(searchLower)
+      );
+    }
 
     // フォルダごとにグループ化
     const folderMap = new Map<string, {
@@ -805,8 +889,45 @@ export const ScannedFileService = {
       });
     }
 
-    // リスクスコア合計の降順でソート
-    folders.sort((a, b) => b.totalRiskScore - a.totalRiskScore);
+    // ソート処理
+    folders.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'ja');
+          break;
+        case 'fileCount':
+          comparison = a.fileCount - b.fileCount;
+          break;
+        case 'riskScore':
+        default:
+          // まず最高リスクレベルでソート
+          const levelDiff = riskLevelPriority(a.highestRiskLevel) - riskLevelPriority(b.highestRiskLevel);
+          if (levelDiff !== 0) {
+            comparison = levelDiff;
+          } else {
+            // 同じリスクレベル内では、緊急→高→中→低の順でファイル数でソート
+            const criticalDiff = a.riskySummary.critical - b.riskySummary.critical;
+            if (criticalDiff !== 0) {
+              comparison = criticalDiff;
+            } else {
+              const highDiff = a.riskySummary.high - b.riskySummary.high;
+              if (highDiff !== 0) {
+                comparison = highDiff;
+              } else {
+                const mediumDiff = a.riskySummary.medium - b.riskySummary.medium;
+                if (mediumDiff !== 0) {
+                  comparison = mediumDiff;
+                } else {
+                  comparison = a.riskySummary.low - b.riskySummary.low;
+                }
+              }
+            }
+          }
+          break;
+      }
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
 
     // ページネーション
     const total = folders.length;

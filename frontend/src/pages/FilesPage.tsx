@@ -995,7 +995,7 @@ export function FilesPage() {
   const [ownerTypeFilter, setOwnerTypeFilter] = useState<OwnerType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'riskScore' | 'name' | 'modifiedTime'>('riskScore');
+  const [sortBy, setSortBy] = useState<'riskScore' | 'name' | 'modifiedTime' | 'fileCount'>('riskScore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [offset, setOffset] = useState(0);
   const [folderOffset, setFolderOffset] = useState(0);
@@ -1033,8 +1033,9 @@ export function FilesPage() {
   });
 
   // Get files
+  const fileSortBy = sortBy === 'fileCount' ? 'riskScore' : sortBy as 'riskScore' | 'name' | 'modifiedTime';
   const { data: filesData, isLoading, isError, error: filesError, isFetching } = useQuery({
-    queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, debouncedSearch, sortBy, sortOrder, offset],
+    queryKey: ['scanFiles', scanId, riskLevelFilter, ownerTypeFilter, debouncedSearch, fileSortBy, sortOrder, offset],
     queryFn: () =>
       scanApi.getFiles(scanId!, {
         limit,
@@ -1042,20 +1043,25 @@ export function FilesPage() {
         riskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
         ownerType: ownerTypeFilter === 'all' ? undefined : ownerTypeFilter,
         search: debouncedSearch || undefined,
-        sortBy,
+        sortBy: fileSortBy,
         sortOrder,
       }),
     enabled: !!scanId && viewMode === 'files',
   });
 
   // Get folders
+  const folderSortBy = sortBy === 'modifiedTime' ? 'riskScore' : sortBy as 'riskScore' | 'name' | 'fileCount';
   const { data: foldersData, isLoading: isFoldersLoading, isError: isFoldersError, error: foldersError } = useQuery({
-    queryKey: ['scanFolders', scanId, riskLevelFilter, folderOffset],
+    queryKey: ['scanFolders', scanId, riskLevelFilter, ownerTypeFilter, debouncedSearch, folderOffset, folderSortBy, sortOrder],
     queryFn: () =>
       scanApi.getFolders(scanId!, {
         limit,
         offset: folderOffset,
         minRiskLevel: riskLevelFilter === 'all' ? undefined : riskLevelFilter,
+        ownerType: ownerTypeFilter === 'all' ? undefined : ownerTypeFilter,
+        search: debouncedSearch || undefined,
+        sortBy: folderSortBy,
+        sortOrder,
       }),
     enabled: !!scanId && viewMode === 'folders',
   });
@@ -1240,6 +1246,7 @@ export function FilesPage() {
                   onClick={() => {
                     setRiskLevelFilter(isActive ? 'all' : level);
                     setOffset(0);
+                    setFolderOffset(0);
                   }}
                   className={`p-4 rounded-xl text-center transition-all ${
                     isActive
@@ -1263,6 +1270,10 @@ export function FilesPage() {
               onClick={() => {
                 setViewMode('files');
                 setOffset(0);
+                // フォルダ専用のソートが選択されていたらリセット
+                if (sortBy === 'fileCount') {
+                  setSortBy('riskScore');
+                }
               }}
               className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
                 viewMode === 'files'
@@ -1280,6 +1291,10 @@ export function FilesPage() {
                 setViewMode('folders');
                 setFolderOffset(0);
                 setExpandedFolderId(null);
+                // ファイル専用のソートが選択されていたらリセット
+                if (sortBy === 'modifiedTime') {
+                  setSortBy('riskScore');
+                }
               }}
               className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
                 viewMode === 'folders'
@@ -1294,85 +1309,94 @@ export function FilesPage() {
             </button>
           </div>
 
-          {/* Owner Type Filter (only for files view) */}
-          {viewMode === 'files' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-[#5f6368]">所有者:</span>
-              <div className="flex gap-1">
-                {(['all', 'internal', 'external'] as OwnerType[]).map((type) => {
-                  const label = type === 'all' ? 'すべて' : type === 'internal' ? '自社' : '外部';
-                  const isActive = ownerTypeFilter === type;
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => {
-                        setOwnerTypeFilter(type);
-                        setOffset(0);
-                      }}
-                      className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
-                        isActive
-                          ? 'bg-[#1a73e8] text-white'
-                          : 'bg-[#f1f3f4] text-[#5f6368] hover:bg-[#e8eaed]'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Search & Sort (only for files view) */}
-          {viewMode === 'files' && (
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Search */}
-              <div className="relative">
-                <svg className="w-4 h-4 text-[#5f6368] absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                </svg>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ファイル名で検索..."
-                  className="w-64 pl-9 pr-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent"
-                />
-                {searchQuery && (
+          {/* Owner Type Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[#5f6368]">所有者:</span>
+            <div className="flex gap-1">
+              {(['all', 'internal', 'external'] as OwnerType[]).map((type) => {
+                const label = type === 'all' ? 'すべて' : type === 'internal' ? '自社' : '外部';
+                const isActive = ownerTypeFilter === type;
+                return (
                   <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-[#f1f3f4] rounded-full"
+                    key={type}
+                    onClick={() => {
+                      setOwnerTypeFilter(type);
+                      setOffset(0);
+                      setFolderOffset(0);
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
+                      isActive
+                        ? 'bg-[#1a73e8] text-white'
+                        : 'bg-[#f1f3f4] text-[#5f6368] hover:bg-[#e8eaed]'
+                    }`}
                   >
-                    <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                    </svg>
+                    {label}
                   </button>
-                )}
-              </div>
-
-              {/* Sort */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[#5f6368]">並び替え:</span>
-                <select
-                  value={`${sortBy}-${sortOrder}`}
-                  onChange={(e) => {
-                    const [newSortBy, newSortOrder] = e.target.value.split('-') as ['riskScore' | 'name' | 'modifiedTime', 'asc' | 'desc'];
-                    setSortBy(newSortBy);
-                    setSortOrder(newSortOrder);
-                    setOffset(0);
-                  }}
-                  className="px-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent bg-white"
-                >
-                  <option value="riskScore-desc">リスク高い順</option>
-                  <option value="riskScore-asc">リスク低い順</option>
-                  <option value="name-asc">ファイル名 A-Z</option>
-                  <option value="name-desc">ファイル名 Z-A</option>
-                  <option value="modifiedTime-desc">更新日新しい順</option>
-                  <option value="modifiedTime-asc">更新日古い順</option>
-                </select>
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+          {/* Search & Sort */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Search */}
+            <div className="relative">
+              <svg className="w-4 h-4 text-[#5f6368] absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={viewMode === 'files' ? 'ファイル名で検索...' : 'ファイル名・オーナー名で検索...'}
+                className="w-64 pl-9 pr-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-[#f1f3f4] rounded-full"
+                >
+                  <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#5f6368]">並び替え:</span>
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortOrder] = e.target.value.split('-') as ['riskScore' | 'name' | 'modifiedTime' | 'fileCount', 'asc' | 'desc'];
+                  setSortBy(newSortBy);
+                  setSortOrder(newSortOrder);
+                  setOffset(0);
+                  setFolderOffset(0);
+                }}
+                className="px-3 py-2 text-sm border border-[#dadce0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent bg-white"
+              >
+                <option value="riskScore-desc">リスク高い順</option>
+                <option value="riskScore-asc">リスク低い順</option>
+                {viewMode === 'files' ? (
+                  <>
+                    <option value="name-asc">ファイル名 A-Z</option>
+                    <option value="name-desc">ファイル名 Z-A</option>
+                    <option value="modifiedTime-desc">更新日新しい順</option>
+                    <option value="modifiedTime-asc">更新日古い順</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="name-asc">フォルダ名 A-Z</option>
+                    <option value="name-desc">フォルダ名 Z-A</option>
+                    <option value="fileCount-desc">ファイル数多い順</option>
+                    <option value="fileCount-asc">ファイル数少ない順</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Filter info */}

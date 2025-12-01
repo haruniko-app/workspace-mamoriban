@@ -407,11 +407,19 @@ router.get('/:scanId/folders', async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
     const minRiskLevel = req.query.minRiskLevel as 'critical' | 'high' | 'medium' | 'low' | undefined;
+    const ownerType = req.query.ownerType as 'internal' | 'external' | undefined;
+    const search = req.query.search as string | undefined;
+    const sortBy = req.query.sortBy as 'riskScore' | 'name' | 'fileCount' | undefined;
+    const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
 
     const { folders, total } = await ScannedFileService.getByFolder(scanId, {
       limit,
       offset,
       minRiskLevel,
+      ownerType,
+      search,
+      sortBy,
+      sortOrder,
     });
 
     res.json({
