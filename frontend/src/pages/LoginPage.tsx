@@ -186,7 +186,7 @@ export function LoginPage() {
                   )}
 
                   {/* Terms Agreement Checkbox */}
-                  <label className="flex items-start gap-3 cursor-pointer group">
+                  <label className="flex items-start gap-3 cursor-pointer group mb-4">
                     <div className="relative flex items-center justify-center mt-0.5">
                       <input
                         type="checkbox"
