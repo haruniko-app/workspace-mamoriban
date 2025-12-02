@@ -816,16 +816,16 @@ export const ScannedFileService = {
       }
     }
 
-    // 全ファイルを取得してメモリ上でグループ化
+    // ownerType フィルター - Firestoreクエリレベルで適用（メモリ効率化）
+    if (ownerType === 'internal') {
+      query = query.where('isInternalOwner', '==', true);
+    } else if (ownerType === 'external') {
+      query = query.where('isInternalOwner', '==', false);
+    }
+
+    // ファイルを取得してメモリ上でグループ化
     const snapshot = await query.get();
     let files = snapshot.docs.map((doc) => doc.data() as ScannedFile);
-
-    // ownerType フィルター適用
-    if (ownerType === 'internal') {
-      files = files.filter(f => f.isInternalOwner);
-    } else if (ownerType === 'external') {
-      files = files.filter(f => !f.isInternalOwner);
-    }
 
     // search フィルター適用
     if (search) {
