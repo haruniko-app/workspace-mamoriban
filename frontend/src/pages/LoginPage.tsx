@@ -50,8 +50,26 @@ export function LoginPage() {
             </div>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
-            <a href="#features" className="hover:text-blue-600 transition-colors">機能</a>
-            <a href="#security" className="hover:text-blue-600 transition-colors">安心設計</a>
+            <a
+              href="#features"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              機能
+            </a>
+            <a
+              href="#security"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById('security')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              安心設計
+            </a>
             <Link to="/terms" className="hover:text-blue-600 transition-colors">利用規約</Link>
           </nav>
         </div>
@@ -73,7 +91,7 @@ export function LoginPage() {
             </svg>
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-6 pt-12 pb-32">
+          <div className="relative max-w-7xl mx-auto px-6 pt-12 pb-44">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left - Text Content */}
               <div className="text-white">
