@@ -256,7 +256,7 @@ export function LoginPage() {
         <div id="features" className="py-16 bg-sky-50">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+              <h2 className="text-3xl font-bold text-gray-800 mb-4 leading-[2.5rem]">
                 こんなリスク、<span className="text-blue-600">放置していませんか？</span>
               </h2>
             </div>
@@ -309,7 +309,7 @@ export function LoginPage() {
                   </svg>
                   安心設計
                 </div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                <h2 className="text-3xl font-bold text-gray-800 mb-4 leading-[2.5rem]">
                   ファイルの中身は<br /><span className="text-green-600">一切見ません</span>
                 </h2>
                 <p className="text-gray-600 mb-6 leading-relaxed">
@@ -387,7 +387,7 @@ export function LoginPage() {
         {/* CTA Section */}
         <div className="py-16 bg-gradient-to-r from-blue-500 to-blue-600">
           <div className="max-w-4xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
+            <h2 className="text-3xl font-bold text-white mb-4 leading-[2.5rem]">
               5分のスキャンで、見えなかったリスクが見える
             </h2>
             <p className="text-blue-100 mb-8">
