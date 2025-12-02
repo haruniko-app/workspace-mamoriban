@@ -733,9 +733,9 @@ export const ScannedFileService = {
   }> {
     const { limit = 20, offset = 0, minRiskLevel, ownerType, search, sortBy = 'riskScore', sortOrder = 'desc' } = options;
 
-    // ownerType や search フィルターがある場合は事前計算済みサマリーを使用できない
-    // ファイルを直接スキャンしてフィルター適用後に集計する
-    const hasAdvancedFilters = ownerType || search;
+    // searchフィルターがある場合のみ事前計算済みサマリーを使用できない
+    // ownerTypeは事前計算済みデータに含まれている
+    const hasSearchFilter = !!search;
 
     // リスクレベルを数値に変換（ソート用）
     const riskLevelPriority = (level: string): number => {
@@ -748,12 +748,41 @@ export const ScannedFileService = {
       }
     };
 
-    if (!hasAdvancedFilters) {
+    if (!hasSearchFilter) {
       // まず事前計算済みサマリーを試す（全件取得してソート・ページネーションはJS側で行う）
       const precomputed = await this.getFolderSummaries(scanId, { limit: 10000, offset: 0, minRiskLevel });
       if (precomputed.precomputed) {
+        // ownerTypeに応じてデータをマッピング
+        let folders = precomputed.folders.map(folder => {
+          if (ownerType === 'internal') {
+            // 組織内オーナーのデータを使用
+            return {
+              ...folder,
+              fileCount: folder.internalFileCount ?? 0,
+              riskySummary: folder.internalRiskySummary ?? { critical: 0, high: 0, medium: 0, low: 0 },
+              totalRiskScore: folder.internalTotalRiskScore ?? 0,
+              highestRiskLevel: folder.internalHighestRiskLevel ?? 'low',
+            };
+          } else if (ownerType === 'external') {
+            // 組織外オーナーのデータを使用
+            return {
+              ...folder,
+              fileCount: folder.externalFileCount ?? 0,
+              riskySummary: folder.externalRiskySummary ?? { critical: 0, high: 0, medium: 0, low: 0 },
+              totalRiskScore: folder.externalTotalRiskScore ?? 0,
+              highestRiskLevel: folder.externalHighestRiskLevel ?? 'low',
+            };
+          }
+          return folder;
+        }).filter(folder => folder.fileCount > 0); // ファイル数0のフォルダを除外
+
+        // minRiskLevelフィルター適用
+        if (minRiskLevel) {
+          const riskLevelMinPriority = riskLevelPriority(minRiskLevel);
+          folders = folders.filter(f => riskLevelPriority(f.highestRiskLevel) >= riskLevelMinPriority);
+        }
+
         // ソートを適用
-        let folders = [...precomputed.folders];
         folders.sort((a, b) => {
           let comparison = 0;
           switch (sortBy) {
@@ -795,13 +824,14 @@ export const ScannedFileService = {
         // ページネーション
         const total = folders.length;
         const paginatedFolders = folders.slice(offset, offset + limit);
+        console.log(`Scan ${scanId}: Using precomputed folder summaries (ownerType=${ownerType}, total=${total})`);
         return { folders: paginatedFolders, total };
       }
     }
 
-    // 事前計算済みサマリーがない場合、またはフィルターがある場合はフォールバック
-    if (hasAdvancedFilters) {
-      console.log(`Scan ${scanId}: Using file-based folder calculation due to advanced filters (ownerType=${ownerType}, search=${search})`);
+    // 事前計算済みサマリーがない場合、またはsearchフィルターがある場合はフォールバック
+    if (hasSearchFilter) {
+      console.log(`Scan ${scanId}: Using file-based folder calculation due to search filter (search=${search})`);
     } else {
       console.log(`Scan ${scanId}: No precomputed folder summaries, falling back to legacy method`);
     }
@@ -1053,6 +1083,14 @@ export const ScannedFileService = {
       folderMap.get(folderId)!.files.push(file);
     }
 
+    // ヘルパー関数: 最高リスクレベルを決定
+    const getHighestRiskLevel = (summary: RiskySummary): 'critical' | 'high' | 'medium' | 'low' => {
+      if (summary.critical > 0) return 'critical';
+      if (summary.high > 0) return 'high';
+      if (summary.medium > 0) return 'medium';
+      return 'low';
+    };
+
     // バッチ書き込み（500件ずつ）
     const BATCH_SIZE = 500;
     const folderEntries = Array.from(folderMap.entries());
@@ -1062,19 +1100,36 @@ export const ScannedFileService = {
       const chunk = folderEntries.slice(i, i + BATCH_SIZE);
 
       for (const [folderId, folder] of chunk) {
-        const riskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+        // 全体の統計
+        const riskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
         let totalRiskScore = 0;
 
+        // 組織内オーナーの統計
+        const internalRiskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+        let internalTotalRiskScore = 0;
+        let internalFileCount = 0;
+
+        // 組織外オーナーの統計
+        const externalRiskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+        let externalTotalRiskScore = 0;
+        let externalFileCount = 0;
+
         for (const file of folder.files) {
+          // 全体
           riskySummary[file.riskLevel]++;
           totalRiskScore += file.riskScore;
-        }
 
-        // 最高リスクレベルを決定
-        let highestRiskLevel: 'critical' | 'high' | 'medium' | 'low' = 'low';
-        if (riskySummary.critical > 0) highestRiskLevel = 'critical';
-        else if (riskySummary.high > 0) highestRiskLevel = 'high';
-        else if (riskySummary.medium > 0) highestRiskLevel = 'medium';
+          // 組織内/外別
+          if (file.isInternalOwner) {
+            internalRiskySummary[file.riskLevel]++;
+            internalTotalRiskScore += file.riskScore;
+            internalFileCount++;
+          } else {
+            externalRiskySummary[file.riskLevel]++;
+            externalTotalRiskScore += file.riskScore;
+            externalFileCount++;
+          }
+        }
 
         const summary: FolderSummary = {
           id: folderId,
@@ -1082,8 +1137,18 @@ export const ScannedFileService = {
           parentFolderId: folder.parentFolderId,
           fileCount: folder.files.length,
           riskySummary,
-          highestRiskLevel,
+          highestRiskLevel: getHighestRiskLevel(riskySummary),
           totalRiskScore,
+          // 組織内オーナー用
+          internalFileCount,
+          internalRiskySummary,
+          internalTotalRiskScore,
+          internalHighestRiskLevel: getHighestRiskLevel(internalRiskySummary),
+          // 組織外オーナー用
+          externalFileCount,
+          externalRiskySummary,
+          externalTotalRiskScore,
+          externalHighestRiskLevel: getHighestRiskLevel(externalRiskySummary),
         };
 
         batch.set(summariesRef.doc(folderId), summary);
@@ -1242,19 +1307,31 @@ function getRiskLevelsAbove(minLevel: 'critical' | 'high' | 'medium' | 'low'): s
 /**
  * フォルダサマリー型
  */
+export interface RiskySummary {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
 export interface FolderSummary {
   id: string;
   name: string;
   parentFolderId: string | null;  // 親フォルダID（サブフォルダ取得用）
   fileCount: number;
-  riskySummary: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
+  riskySummary: RiskySummary;
   highestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
   totalRiskScore: number;
+  // 組織内オーナー用（事前計算）
+  internalFileCount?: number;
+  internalRiskySummary?: RiskySummary;
+  internalTotalRiskScore?: number;
+  internalHighestRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
+  // 組織外オーナー用（事前計算）
+  externalFileCount?: number;
+  externalRiskySummary?: RiskySummary;
+  externalTotalRiskScore?: number;
+  externalHighestRiskLevel?: 'critical' | 'high' | 'medium' | 'low';
 }
 
 /**
