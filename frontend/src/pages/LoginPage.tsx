@@ -54,7 +54,7 @@ export function LoginPage() {
       {/* Main Content */}
       <main className="flex-1 flex">
         {/* Left side - Hero */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 to-slate-800 items-center justify-center p-12">
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center p-12">
           <div className="max-w-lg">
             {/* Risk Appeal Headline */}
             <h1 className="text-4xl font-bold text-white leading-tight mb-4">
@@ -70,38 +70,38 @@ export function LoginPage() {
 
             {/* Risk Statistics */}
             <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                <div className="text-3xl font-bold text-red-400 mb-1">4億円</div>
-                <div className="text-xs text-slate-400">情報漏洩の<br/>平均被害額</div>
+              <div className="bg-white/10 rounded-xl p-4 border border-white/20 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-red-300 mb-1">4億円</div>
+                <div className="text-xs text-blue-100">情報漏洩の<br/>平均被害額</div>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                <div className="text-3xl font-bold text-orange-400 mb-1">62%</div>
-                <div className="text-xs text-slate-400">中小企業の<br/>セキュリティ未対策率</div>
+              <div className="bg-white/10 rounded-xl p-4 border border-white/20 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-orange-300 mb-1">62%</div>
+                <div className="text-xs text-blue-100">中小企業の<br/>セキュリティ未対策率</div>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                <div className="text-3xl font-bold text-yellow-400 mb-1">280日</div>
-                <div className="text-xs text-slate-400">漏洩発覚まで<br/>の平均日数</div>
+              <div className="bg-white/10 rounded-xl p-4 border border-white/20 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-yellow-300 mb-1">280日</div>
+                <div className="text-xs text-blue-100">漏洩発覚まで<br/>の平均日数</div>
               </div>
             </div>
 
             {/* Risk Scenarios */}
-            <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700 mb-6">
-              <div className="text-sm font-medium text-slate-300 mb-3">こんなリスク、放置していませんか？</div>
+            <div className="bg-white/10 rounded-xl p-5 border border-white/20 backdrop-blur-sm mb-6">
+              <div className="text-sm font-medium text-white mb-3">こんなリスク、放置していませんか？</div>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2 text-sm text-blue-100">
+                  <svg className="w-4 h-4 text-yellow-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <span>退職者がまだ機密ファイルにアクセス可能</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2 text-sm text-blue-100">
+                  <svg className="w-4 h-4 text-yellow-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <span>「全員に公開」のまま放置されたファイル</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2 text-sm text-blue-100">
+                  <svg className="w-4 h-4 text-yellow-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <span>外部パートナーに渡したファイルが編集可能</span>
@@ -110,19 +110,19 @@ export function LoginPage() {
             </div>
 
             {/* Privacy Guarantee - Strong emphasis */}
-            <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-700 mb-4">
+            <div className="bg-white/10 rounded-xl p-4 border border-white/20 backdrop-blur-sm mb-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-10 h-10 rounded-full bg-green-400/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-emerald-400 mb-1">
+                  <div className="text-sm font-bold text-green-300 mb-1">
                     ファイルの中身は一切見ません
                   </div>
-                  <div className="text-xs text-slate-400 leading-relaxed">
-                    ヒューリスティックスキャンにより、<span className="text-emerald-400 font-medium">ファイル名・共有設定・メタデータのみ</span>を解析。
+                  <div className="text-xs text-blue-100 leading-relaxed">
+                    ヒューリスティックスキャンにより、<span className="text-green-300 font-medium">ファイル名・共有設定・メタデータのみ</span>を解析。
                     ファイルの内容（本文・画像・添付データ）には一切アクセスしません。
                     機密情報が外部に送信されることはありません。
                   </div>
@@ -131,21 +131,21 @@ export function LoginPage() {
             </div>
 
             {/* ISMS / P-Mark Badge */}
-            <div className="bg-blue-900/30 rounded-xl p-4 border border-blue-700 mb-8">
+            <div className="bg-white/10 rounded-xl p-4 border border-white/20 backdrop-blur-sm mb-8">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-blue-400 mb-1">
+                  <div className="text-sm font-bold text-white mb-1">
                     ISMS / Pマーク審査対応
                   </div>
-                  <div className="text-xs text-slate-400 leading-relaxed">
-                    スキャン結果を<span className="text-blue-400 font-medium">審査で使えるPDFレポート</span>として出力。
+                  <div className="text-xs text-blue-100 leading-relaxed">
+                    スキャン結果を<span className="text-white font-medium">審査で使えるPDFレポート</span>として出力。
                     アクセス権限一覧・リスク評価・改善履歴を監査証跡として提出可能。
-                    <span className="text-blue-400 font-medium">競合他社にはない独自機能</span>です。
+                    <span className="text-white font-medium">競合他社にはない独自機能</span>です。
                   </div>
                 </div>
               </div>
@@ -156,17 +156,17 @@ export function LoginPage() {
               <div className="text-xl font-bold text-white mb-2">
                 5分のスキャンで、見えなかったリスクが見える
               </div>
-              <div className="text-sm text-slate-400 mb-4">
+              <div className="text-sm text-blue-100 mb-4">
                 無料プランで今すぐ診断 →
               </div>
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center justify-center gap-2 text-xs text-blue-200">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 <span>クレジットカード不要</span>
-                <span className="text-slate-600">・</span>
+                <span className="text-blue-300">・</span>
                 <span>5分で導入完了</span>
-                <span className="text-slate-600">・</span>
+                <span className="text-blue-300">・</span>
                 <span>月2回無料スキャン</span>
               </div>
             </div>
