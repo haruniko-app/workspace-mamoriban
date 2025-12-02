@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { FirestoreStore } from 'firestore-store';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -19,7 +20,7 @@ import notificationRoutes from './routes/notifications.js';
 import delegationRoutes from './routes/delegation.js';
 
 // Services
-import { ScanService } from './services/firestore.js';
+import { ScanService, firestore } from './services/firestore.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -41,7 +42,16 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json());
 app.use(cookieParser());
+// Session store: Firestore in production, MemoryStore in development
+const sessionStore = process.env.NODE_ENV === 'production'
+  ? new FirestoreStore({
+      database: firestore,
+      collection: 'sessions',
+    })
+  : undefined; // Use default MemoryStore in development
+
 app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
