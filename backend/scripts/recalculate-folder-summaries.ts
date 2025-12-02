@@ -10,20 +10,41 @@ interface ScannedFile {
   parentFolderName: string | null;
   riskScore: number;
   riskLevel: 'critical' | 'high' | 'medium' | 'low';
+  isInternalOwner: boolean;
+}
+
+interface RiskySummary {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
 }
 
 interface FolderSummary {
   id: string;
   name: string;
+  parentFolderId: string | null;
   fileCount: number;
-  riskySummary: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
+  riskySummary: RiskySummary;
   highestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
   totalRiskScore: number;
+  // 組織内オーナー用
+  internalFileCount: number;
+  internalRiskySummary: RiskySummary;
+  internalTotalRiskScore: number;
+  internalHighestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+  // 組織外オーナー用
+  externalFileCount: number;
+  externalRiskySummary: RiskySummary;
+  externalTotalRiskScore: number;
+  externalHighestRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+}
+
+function getHighestRiskLevel(summary: RiskySummary): 'critical' | 'high' | 'medium' | 'low' {
+  if (summary.critical > 0) return 'critical';
+  if (summary.high > 0) return 'high';
+  if (summary.medium > 0) return 'medium';
+  return 'low';
 }
 
 async function recalculateFolderSummaries(scanId: string): Promise<number> {
@@ -75,27 +96,55 @@ async function recalculateFolderSummaries(scanId: string): Promise<number> {
     const chunk = folderEntries.slice(i, i + BATCH_SIZE);
 
     for (const [folderId, folder] of chunk) {
-      const riskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+      // 全体の統計
+      const riskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
       let totalRiskScore = 0;
 
+      // 組織内オーナーの統計
+      const internalRiskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+      let internalTotalRiskScore = 0;
+      let internalFileCount = 0;
+
+      // 組織外オーナーの統計
+      const externalRiskySummary: RiskySummary = { critical: 0, high: 0, medium: 0, low: 0 };
+      let externalTotalRiskScore = 0;
+      let externalFileCount = 0;
+
       for (const file of folder.files) {
+        // 全体
         riskySummary[file.riskLevel]++;
         totalRiskScore += file.riskScore;
-      }
 
-      // 最高リスクレベルを決定
-      let highestRiskLevel: 'critical' | 'high' | 'medium' | 'low' = 'low';
-      if (riskySummary.critical > 0) highestRiskLevel = 'critical';
-      else if (riskySummary.high > 0) highestRiskLevel = 'high';
-      else if (riskySummary.medium > 0) highestRiskLevel = 'medium';
+        // 組織内/外別
+        if (file.isInternalOwner) {
+          internalRiskySummary[file.riskLevel]++;
+          internalTotalRiskScore += file.riskScore;
+          internalFileCount++;
+        } else {
+          externalRiskySummary[file.riskLevel]++;
+          externalTotalRiskScore += file.riskScore;
+          externalFileCount++;
+        }
+      }
 
       const summary: FolderSummary = {
         id: folderId,
         name: folder.name,
+        parentFolderId: null, // 既存データからは親フォルダIDを取得できない
         fileCount: folder.files.length,
         riskySummary,
-        highestRiskLevel,
+        highestRiskLevel: getHighestRiskLevel(riskySummary),
         totalRiskScore,
+        // 組織内オーナー用
+        internalFileCount,
+        internalRiskySummary,
+        internalTotalRiskScore,
+        internalHighestRiskLevel: getHighestRiskLevel(internalRiskySummary),
+        // 組織外オーナー用
+        externalFileCount,
+        externalRiskySummary,
+        externalTotalRiskScore,
+        externalHighestRiskLevel: getHighestRiskLevel(externalRiskySummary),
       };
 
       batch.set(summariesRef.doc(folderId), summary);
