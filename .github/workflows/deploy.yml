@@ -54,6 +54,8 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
             --set-env-vars "NODE_ENV=production,GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},FRONTEND_URL=${{ steps.frontend-url.outputs.url }},BACKEND_URL=${{ steps.backend-url.outputs.url }},SESSION_SECRET=${{ secrets.SESSION_SECRET }},GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }},STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }},STRIPE_BASIC_PRICE_ID=${{ secrets.STRIPE_BASIC_PRICE_ID }},STRIPE_PRO_PRICE_ID=${{ secrets.STRIPE_PRO_PRICE_ID }},STRIPE_ENTERPRISE_PRICE_ID=${{ secrets.STRIPE_ENTERPRISE_PRICE_ID }}"
 
   deploy-frontend:
