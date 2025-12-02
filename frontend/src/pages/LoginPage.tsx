@@ -95,7 +95,7 @@ export function LoginPage() {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left - Text Content */}
               <div className="text-white">
-                <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6">
+                <h1 className="text-4xl md:text-5xl font-bold leading-snug md:leading-normal mb-6">
                   Google Drive™ の<br />
                   <span className="text-yellow-300">共有リスク</span>を<br />
                   5分で可視化
@@ -107,17 +107,17 @@ export function LoginPage() {
 
                 {/* Stats Badges */}
                 <div className="flex flex-wrap gap-4 mb-8">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-5 py-2 flex items-center gap-2">
-                    <span className="text-2xl font-bold text-yellow-300">5分</span>
-                    <span className="text-sm text-blue-100">で導入完了</span>
+                  <div className="bg-yellow-300 rounded-xl px-5 py-2 flex items-center gap-2 shadow-lg">
+                    <span className="text-2xl font-bold text-blue-600">5分</span>
+                    <span className="text-sm text-blue-600 font-medium">で導入完了</span>
                   </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-5 py-2 flex items-center gap-2">
-                    <span className="text-2xl font-bold text-yellow-300">月2回</span>
-                    <span className="text-sm text-blue-100">無料スキャン</span>
+                  <div className="bg-yellow-300 rounded-xl px-5 py-2 flex items-center gap-2 shadow-lg">
+                    <span className="text-2xl font-bold text-blue-600">月2回</span>
+                    <span className="text-sm text-blue-600 font-medium">無料スキャン</span>
                   </div>
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-5 py-2 flex items-center gap-2">
-                    <span className="text-2xl font-bold text-yellow-300">0円</span>
-                    <span className="text-sm text-blue-100">から始められる</span>
+                  <div className="bg-yellow-300 rounded-xl px-5 py-2 flex items-center gap-2 shadow-lg">
+                    <span className="text-2xl font-bold text-blue-600">0円</span>
+                    <span className="text-sm text-blue-600 font-medium">から始められる</span>
                   </div>
                 </div>
 
