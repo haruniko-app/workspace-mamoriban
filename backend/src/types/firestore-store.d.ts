@@ -15,10 +15,5 @@ declare module 'firestore-store' {
     constructor(options: FirestoreStoreOptions);
   }
 
-  const firestoreStore: {
-    FirestoreStore: typeof FirestoreStore;
-  };
-
-  export default firestoreStore;
-  export { FirestoreStore };
+  export = FirestoreStore;
 }

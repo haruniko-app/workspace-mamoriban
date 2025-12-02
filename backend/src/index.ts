@@ -7,8 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import firestoreStore from 'firestore-store';
-const { FirestoreStore } = firestoreStore;
+import FirestoreStore from 'firestore-store';
 
 // Routes
 import authRoutes from './routes/auth.js';
