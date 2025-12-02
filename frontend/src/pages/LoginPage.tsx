@@ -7,6 +7,7 @@ const features = [
   '情報漏洩リスクを0-100点で可視化',
   '外部共有・公開リンクを即座に検出',
   '改善提案を日本語でわかりやすく表示',
+  'ISMS / Pマーク審査対応PDFレポート出力',
 ];
 
 export function LoginPage() {
@@ -109,7 +110,7 @@ export function LoginPage() {
             </div>
 
             {/* Privacy Guarantee - Strong emphasis */}
-            <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-700 mb-8">
+            <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-700 mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
                   <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -124,6 +125,27 @@ export function LoginPage() {
                     ヒューリスティックスキャンにより、<span className="text-emerald-400 font-medium">ファイル名・共有設定・メタデータのみ</span>を解析。
                     ファイルの内容（本文・画像・添付データ）には一切アクセスしません。
                     機密情報が外部に送信されることはありません。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ISMS / P-Mark Badge */}
+            <div className="bg-blue-900/30 rounded-xl p-4 border border-blue-700 mb-8">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-blue-400 mb-1">
+                    ISMS / Pマーク審査対応
+                  </div>
+                  <div className="text-xs text-slate-400 leading-relaxed">
+                    スキャン結果を<span className="text-blue-400 font-medium">審査で使えるPDFレポート</span>として出力。
+                    アクセス権限一覧・リスク評価・改善履歴を監査証跡として提出可能。
+                    <span className="text-blue-400 font-medium">競合他社にはない独自機能</span>です。
                   </div>
                 </div>
               </div>
