@@ -11,7 +11,14 @@ declare module 'firestore-store' {
     };
   }
 
-  export class FirestoreStore extends Store {
+  class FirestoreStore extends Store {
     constructor(options: FirestoreStoreOptions);
   }
+
+  const firestoreStore: {
+    FirestoreStore: typeof FirestoreStore;
+  };
+
+  export default firestoreStore;
+  export { FirestoreStore };
 }
