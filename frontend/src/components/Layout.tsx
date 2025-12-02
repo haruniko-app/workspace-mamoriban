@@ -147,7 +147,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
             <div className="hidden sm:flex items-baseline gap-1">
               <span className="text-xl font-bold text-gray-800">Workspace</span>
-              <span className="text-xl text-blue-600 font-bold">守り番</span>
+              <span className="text-xl text-blue-600 font-bold">守り番<sup className="text-xs">™</sup></span>
             </div>
           </Link>
         </div>
@@ -334,7 +334,7 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-lg font-bold text-gray-800">Workspace</span>
-                    <span className="text-lg text-blue-600 font-bold">守り番</span>
+                    <span className="text-lg text-blue-600 font-bold">守り番<sup className="text-xs">™</sup></span>
                   </div>
                 </div>
                 <button
