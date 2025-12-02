@@ -24,6 +24,11 @@ import { ScanService } from './services/firestore.js';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Trust proxy (required for secure cookies behind Cloud Run)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Middleware
 app.use(helmet());
 app.use(cors({
@@ -44,6 +49,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
   },
 }));
 
