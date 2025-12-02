@@ -7,7 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import FirestoreStore from 'firestore-store';
+import { FirestoreSessionStore } from './services/sessionStore.js';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -44,7 +44,7 @@ app.use(express.json());
 app.use(cookieParser());
 // Session store: Firestore in production, MemoryStore in development
 const sessionStore = process.env.NODE_ENV === 'production'
-  ? new FirestoreStore({
+  ? new FirestoreSessionStore({
       database: firestore,
       collection: 'sessions',
     })
