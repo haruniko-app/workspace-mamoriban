@@ -32,7 +32,7 @@ export function TermsPage() {
         <h1 className="text-3xl font-bold text-gray-800 mb-4">利用規約</h1>
         <p className="text-gray-500 mb-12">最終更新日: 2025年11月27日</p>
 
-        <div className="space-y-8 text-gray-600 leading-relaxed">
+        <div className="max-w-4xl space-y-8 text-gray-600 leading-relaxed">
           <p>
             Workspace守り番をご利用いただくことにより、本規約に同意したものとみなされます。
           </p>
