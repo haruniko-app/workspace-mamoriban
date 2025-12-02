@@ -30,6 +30,8 @@ jobs:
 
       - name: Build and Push Backend
         run: |
+          # Copy root package-lock.json to backend for consistent installs
+          cp package-lock.json backend/package-lock.json
           docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.BACKEND_SERVICE }}:${{ github.sha }} ./backend
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/workspace-mamoriban/${{ env.BACKEND_SERVICE }}:${{ github.sha }}
 

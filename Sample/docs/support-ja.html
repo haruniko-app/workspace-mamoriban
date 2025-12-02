@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サポート - Designer's Palette</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-alt: #fafafa;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            font-size: 18px;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 0 40px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .nav-brand-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .nav-brand-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--text);
+        }
+
+        .content {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 120px 40px 80px;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 48px;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            letter-spacing: -0.2px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .contact-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 32px;
+            margin-bottom: 48px;
+        }
+
+        .contact-box h2 {
+            margin-top: 0;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+            padding: 24px 0;
+        }
+
+        .faq-item:first-of-type {
+            border-top: 1px solid var(--border);
+        }
+
+        .faq-question {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-size: 18px;
+        }
+
+        .faq-answer {
+            color: var(--text-secondary);
+            font-size: 17px;
+        }
+
+        ul {
+            color: var(--text-secondary);
+            padding-left: 20px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            font-size: 17px;
+        }
+
+        .footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            margin-top: 80px;
+        }
+
+        .footer-links {
+            margin-bottom: 24px;
+        }
+
+        .footer-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 16px;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 600px) {
+            .nav { padding: 0 20px; }
+            .nav-links { gap: 16px; }
+            .nav-links a { font-size: 13px; }
+            .content { padding: 100px 20px 60px; }
+            h1 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="index-ja.html" class="nav-brand">
+                <span class="nav-brand-title">Designer's Palette</span>
+                <span class="nav-brand-sub">FOR GOOGLE SLIDES™</span>
+            </a>
+            <div class="nav-links">
+                <a href="index-ja.html">TOP</a>
+                <a href="support-ja.html" class="active">サポート</a>
+                <a href="privacy-policy-ja.html">プライバシー</a>
+                <a href="terms-of-service-ja.html">利用規約</a>
+                <a href="feedback-ja.html">問題を報告</a>
+                <a href="support.html">English</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <h1>サポート</h1>
+
+        <div class="contact-box">
+            <h2>お問い合わせ</h2>
+            <p>Designer's Palette for Google Slides™ に関するご質問は、以下までお問い合わせください：</p>
+            <p><strong>株式会社ハルニコ</strong><br>
+            〒123-0852 東京都足立区関原3-5-7<br>
+            メール: info@haruniko.co.jp</p>
+            <p>通常、1〜2営業日以内に返信いたします。</p>
+        </div>
+
+        <h2>よくある質問</h2>
+
+        <div class="faq-item">
+            <div class="faq-question">アドオンをインストールするには？</div>
+            <p class="faq-answer">Google Slidesを開き、拡張機能 → アドオン → アドオンを取得 から「Designer's Palette」を検索してインストール。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">サイドバーを開くには？</div>
+            <p class="faq-answer">インストール後、拡張機能 → Designer's Palette → 開く を選択。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">一部の機能がグレーアウトしているのはなぜ？</div>
+            <p class="faq-answer">一部の機能は特定の要素の選択が必要です。画像編集は画像、テキスト書式設定はテキストボックスが必要です。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">AI機能はどのように動作しますか？</div>
+            <p class="faq-answer">AI機能は安全なクラウドサーバーで画像を処理し、結果を即座に返します。元の画像は保存されません。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">どの画像形式がサポートされていますか？</div>
+            <p class="faq-answer">PNG、JPEG、GIF、WebP。AI機能で最良の結果を得るには、高品質なソース画像を使用してください。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">データは安全ですか？</div>
+            <p class="faq-answer">はい。ほとんどの操作はローカルで行われます。AI機能は暗号化された接続を使用し、データを永続的に保存しません。</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">アンインストールするには？</div>
+            <p class="faq-answer">拡張機能 → アドオン → アドオンを管理 からDesigner's Paletteを見つけてアンインストール。</p>
+        </div>
+
+        <h2>既知の問題</h2>
+        <ul>
+            <li>AI機能にはインターネット接続が必要</li>
+            <li>非常に大きな画像（10MB以上）はサポートされない場合あり</li>
+            <li>整列機能は少なくとも2つの要素が必要</li>
+        </ul>
+
+        <h2>ヒント</h2>
+        <ul>
+            <li>小さな拡張率の方がAI結果が良好</li>
+            <li>変更を適用する前にプレビューを確認</li>
+            <li>Shiftキーを押しながらクリックで複数選択</li>
+        </ul>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="index-ja.html">TOP</a>
+            <a href="support-ja.html">サポート</a>
+            <a href="privacy-policy-ja.html">プライバシー</a>
+            <a href="terms-of-service-ja.html">利用規約</a>
+        </div>
+        <div class="footer-copy">
+            <p>© 2025 株式会社ハルニコ · Google Slides™ is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

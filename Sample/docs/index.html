@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Designer's Palette for Google Slides™</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-alt: #fafafa;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 18px;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 0 40px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .nav-brand-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .nav-brand-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        /* Hero */
+        .hero-section {
+            background: linear-gradient(135deg, rgba(248, 249, 250, 0.6) 0%, rgba(232, 234, 237, 0.6) 100%),
+                        url('images/hero-designer.png');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        .hero {
+            padding: 140px 40px 80px;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-tagline {
+            font-size: 18px;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .hero-tagline-tight {
+            margin-bottom: -8px !important;
+        }
+
+        .hero h1 {
+            font-size: 80px;
+            font-weight: 600;
+            letter-spacing: -2.5px;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .hero-sub {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            letter-spacing: 0.5px;
+        }
+
+        .hero-icon {
+            width: 96px;
+            height: 96px;
+            margin-bottom: 32px;
+            border-radius: 20px;
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+        }
+
+        .cta-btn {
+            display: inline-block;
+            padding: 16px 36px;
+            background: var(--text);
+            color: var(--bg);
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: opacity 0.2s;
+        }
+
+        .cta-btn:hover {
+            opacity: 0.8;
+        }
+
+        /* Section */
+        .section {
+            padding: 70px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 36px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 60px 40px;
+        }
+
+        .feature {
+            text-align: center;
+        }
+
+        .feature-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 24px;
+            stroke: var(--text);
+            stroke-width: 1.2;
+            fill: none;
+        }
+
+        .feature h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.2px;
+        }
+
+        .feature p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Showcase */
+        .showcase {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .showcase:first-of-type {
+            border-top: none;
+        }
+
+        .showcase:nth-child(even) {
+            direction: rtl;
+        }
+
+        .showcase:nth-child(even) > * {
+            direction: ltr;
+        }
+
+        .showcase-visual {
+            aspect-ratio: 4/3;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .showcase-visual img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .showcase-content h3 {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .showcase-content p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.7;
+        }
+
+        .showcase-content ul {
+            list-style: none;
+        }
+
+        .showcase-content li {
+            font-size: 16px;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .showcase-content li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: var(--border);
+        }
+
+        /* Divider */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 0;
+        }
+
+        /* Utility Grid */
+        .utility-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+            margin-bottom: 48px;
+        }
+
+        .utility-category h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .utility-category ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .utility-category li {
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .utility-category li:last-child {
+            border-bottom: none;
+        }
+
+        .utility-benefit {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px 32px;
+            text-align: center;
+        }
+
+        .utility-benefit p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin: 0;
+            line-height: 1.7;
+        }
+
+        .utility-benefit strong {
+            color: var(--text);
+        }
+
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 80px 40px;
+            background: var(--bg-alt);
+        }
+
+        .cta-section h2 {
+            font-size: 32px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .cta-section p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-links {
+            margin-bottom: 24px;
+        }
+
+        .footer-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 16px;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .footer-copy p {
+            margin: 4px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .showcase {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            .showcase:nth-child(even) {
+                direction: ltr;
+            }
+            .utility-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .nav { padding: 0 20px; }
+            .nav-links { gap: 16px; }
+            .nav-links a { font-size: 12px; }
+            .hero { padding: 140px 20px 80px; }
+            .hero h1 { font-size: 48px; }
+            .hero p { font-size: 16px; }
+            .section { padding: 60px 20px; }
+            .section-header { margin-bottom: 48px; }
+            .section-header h2 { font-size: 24px; }
+            .features-grid { grid-template-columns: 1fr; gap: 40px; }
+            .utility-grid { grid-template-columns: 1fr; }
+            .utility-benefit { padding: 20px; }
+            .cta-section { padding: 80px 20px; }
+            .pain-points-grid { grid-template-columns: 1fr !important; }
+        }
+
+        @media (max-width: 900px) {
+            .pain-points-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="nav-brand-title">Designer's Palette</span>
+                <span class="nav-brand-sub">FOR GOOGLE SLIDES™</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">TOP</a>
+                <a href="support.html">Support</a>
+                <a href="privacy-policy.html">Privacy</a>
+                <a href="terms-of-service.html">Terms</a>
+                <a href="feedback.html">Feedback</a>
+                <a href="index-ja.html">日本語</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero-section">
+        <section class="hero">
+            <p class="hero-tagline hero-tagline-tight">Design Tools with AI for designers by designers.</p>
+            <h1>Designer's Palette</h1>
+            <p class="hero-sub">FOR GOOGLE SLIDES™</p>
+            <img src="icon.png" alt="Designer's Palette" class="hero-icon">
+            <p>Professional design tools for presentations. AI-powered image editing, precise alignment, advanced color management.</p>
+            <a href="https://workspace.google.com/marketplace/" class="cta-btn">Install Free</a>
+        </section>
+    </div>
+
+    <!-- Pain Points Section -->
+    <section style="background: var(--bg-alt); padding: 80px 0;">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 40px;">
+            <div class="section-header">
+                <h2>What's Missing in Google Slides</h2>
+                <p style="font-size: 22px; font-weight: 600; color: var(--text);">Sound familiar?</p>
+            </div>
+            <div class="pain-points-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1000px; margin: 0 auto;">
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "My image doesn't fit the slide... I need an external tool just to extend it."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "This image is low-res... if I scale it up, it looks terrible."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "I want to select all objects with this color, but I have to click them one by one."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "I need to space these evenly, but there's no guide — I'm just eyeballing it."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "Copy-pasting styles is tedious... I keep doing the same thing over and over."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        "I cropped this image, but the hidden part showed up when I shared it."
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 56px; font-size: 18px; color: var(--text);">
+                <strong>Designer's Palette</strong> solves all of these.
+            </p>
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="section-header">
+            <h2>All-in-One Design Palette</h2>
+            <p>Everything you need to create professional presentations — unified in one sidebar.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="16" y="16" width="16" height="16" rx="2" fill="none"/>
+                    <rect x="4" y="4" width="40" height="40" rx="2" stroke-dasharray="4 2" fill="none"/>
+                    <!-- 8方向の矢印 -->
+                    <path d="M24 14V6M24 6l-3 3M24 6l3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M24 34v8M24 42l-3-3M24 42l3-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M14 24H6M6 24l3-3M6 24l3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M34 24h8M42 24l-3-3M42 24l-3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M17 17l-6-6M11 11l3 0M11 11l0 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M31 17l6-6M37 11l-3 0M37 11l0 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M17 31l-6 6M11 37l3 0M11 37l0-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M31 31l6 6M37 37l-3 0M37 37l0-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                <h3>AI Image Extension</h3>
+                <p>Expand images beyond borders with generative AI that creates matching content.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="14" y="14" width="10" height="10" rx="1"/>
+                    <rect x="24" y="4" width="20" height="20" rx="2"/>
+                    <path d="M20 24l4 4" stroke-linecap="round"/>
+                    <path d="M28 12l8 8M32 12l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h3>AI Upscaling</h3>
+                <p>Enhance low-resolution images to 2x crisp, high-quality versions with AI.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="36" height="28" rx="2"/>
+                    <circle cx="24" cy="20" r="8" opacity="0.3"/>
+                    <circle cx="24" cy="20" r="5" opacity="0.5"/>
+                    <circle cx="24" cy="20" r="2" fill="currentColor"/>
+                    <path d="M10 40h28M14 44h20" opacity="0.5"/>
+                </svg>
+                <h3>Image Effects</h3>
+                <p>Apply blur, grayscale, sepia, and other effects directly in Slides.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="32" height="24" rx="2"/>
+                    <path d="M8 26l8-8 6 6 8-10 10 12"/>
+                    <line x1="8" y1="38" x2="40" y2="38"/>
+                    <line x1="8" y1="43" x2="28" y2="43"/>
+                </svg>
+                <h3>Crop Commit</h3>
+                <p>Finalize cropped images by permanently removing hidden areas.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="10" width="14" height="14" rx="2"/>
+                    <rect x="28" y="10" width="14" height="14" rx="2"/>
+                    <rect x="6" y="32" width="14" height="10" rx="2"/>
+                    <rect x="28" y="28" width="14" height="14" rx="2"/>
+                    <circle cx="13" cy="17" r="3" fill="currentColor"/>
+                    <circle cx="35" cy="17" r="3" fill="currentColor"/>
+                    <path d="M24 17v14M13 27v5M35 27v1" stroke-dasharray="2 2"/>
+                </svg>
+                <h3>Select Similar</h3>
+                <p>One-click to select all objects sharing the same fill, stroke, or font style.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="8" width="16" height="16" rx="2"/>
+                    <rect x="26" y="8" width="16" height="16" rx="2" stroke-dasharray="3 2"/>
+                    <path d="M14 16h-4v4M14 12v-4h-4"/>
+                    <rect x="6" y="32" width="36" height="8" rx="2"/>
+                    <circle cx="14" cy="36" r="2" fill="currentColor"/>
+                    <circle cx="24" cy="36" r="2" fill="currentColor"/>
+                    <circle cx="34" cy="36" r="2" fill="currentColor"/>
+                </svg>
+                <h3>Style Copy History</h3>
+                <p>Copy styles and apply from history. Reuse formatting across your presentation.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="10" height="10" rx="1"/>
+                    <rect x="19" y="6" width="10" height="10" rx="1"/>
+                    <rect x="32" y="6" width="10" height="10" rx="1"/>
+                    <rect x="6" y="19" width="10" height="10" rx="1"/>
+                    <rect x="19" y="19" width="10" height="10" rx="1"/>
+                    <rect x="32" y="19" width="10" height="10" rx="1"/>
+                    <rect x="6" y="32" width="10" height="10" rx="1"/>
+                    <rect x="19" y="32" width="10" height="10" rx="1"/>
+                    <rect x="32" y="32" width="10" height="10" rx="1"/>
+                </svg>
+                <h3>Grid Duplicate</h3>
+                <p>Create horizontal, vertical, or grid copies with precise spacing control.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="4" y="4" width="18" height="18" rx="2"/>
+                    <rect x="26" y="4" width="18" height="18" rx="2"/>
+                    <rect x="4" y="26" width="18" height="18" rx="2"/>
+                    <circle cx="13" cy="13" r="5"/>
+                    <path d="M31 9h8M35 9v8" stroke-linecap="round"/>
+                    <path d="M9 31h8M9 35h8M9 39h8"/>
+                </svg>
+                <h3>Color & Alignment</h3>
+                <p>Visual color picker, RGB sliders, 6-direction alignment, and precise spacing.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                    <path d="M8 20h32M20 8v32"/>
+                    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+                    <path d="M26 14h8M26 26h8M26 34h8"/>
+                </svg>
+                <h3>Size & Transform</h3>
+                <p>Exact dimensions, aspect ratio lock, rotation, flip, and preset ratios.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <path d="M8 12h32M8 24h24M8 36h28"/>
+                    <rect x="6" y="10" width="4" height="4" rx="1" fill="currentColor"/>
+                    <rect x="6" y="22" width="4" height="4" rx="1" fill="currentColor"/>
+                    <rect x="6" y="34" width="4" height="4" rx="1" fill="currentColor"/>
+                    <path d="M38 30v12M32 36h12" stroke-linecap="round"/>
+                </svg>
+                <h3>Text & Layers</h3>
+                <p>Font controls, line spacing, grouping, and layer ordering in one place.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="36" height="36" rx="2" stroke-dasharray="4 2"/>
+                    <circle cx="24" cy="24" r="3" fill="currentColor"/>
+                    <path d="M24 8v8M24 32v8M8 24h8M32 24h8" stroke-linecap="round"/>
+                    <path d="M12 12l6 6M30 30l6 6M12 36l6-6M30 18l6-6" opacity="0.5"/>
+                </svg>
+                <h3>Position & Coordinates</h3>
+                <p>Set exact X/Y position, and pixel-perfect placement on the slide.</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="24" height="32" rx="2"/>
+                    <path d="M14 16h12M14 22h8M14 28h10"/>
+                    <path d="M36 20l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M32 26h10" stroke-linecap="round"/>
+                </svg>
+                <h3>Export Options</h3>
+                <p>Export slides or selected elements as PNG, JPG, or PDF with quality control.</p>
+            </div>
+
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-ai-extension.png" alt="AI Image Extension">
+            </div>
+            <div class="showcase-content">
+                <h3>AI Image Extension</h3>
+                <p>Seamlessly expand your images in any direction. The AI intelligently generates matching content that blends perfectly with the original.</p>
+                <ul>
+                    <li>Extend in any direction</li>
+                    <li>Seamless blending</li>
+                    <li>Adjustable expansion ratio</li>
+                    <li>Fast cloud processing</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-ai-upscaling.png" alt="AI Upscaling">
+            </div>
+            <div class="showcase-content">
+                <h3>AI Upscaling</h3>
+                <p>Transform low-resolution images into crisp, high-quality versions. AI enhances details and sharpens edges while maintaining natural appearance.</p>
+                <ul>
+                    <li>2x resolution enhancement</li>
+                    <li>Detail preservation</li>
+                    <li>Edge sharpening</li>
+                    <li>Natural result output</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-image-effects.png" alt="Image Effects">
+            </div>
+            <div class="showcase-content">
+                <h3>Image Effects</h3>
+                <p>Apply professional image effects directly within Google Slides. Transform your images with blur and color effects — no external editor needed.</p>
+                <ul>
+                    <li>Blur and pixelate filters</li>
+                    <li>Grayscale and sepia tones</li>
+                    <li>Brightness and contrast</li>
+                    <li>Vignette effect</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-crop-commit.png" alt="Crop Commit">
+            </div>
+            <div class="showcase-content">
+                <h3>Crop Commit</h3>
+                <p>Permanently finalize your image crops. Remove hidden areas to reduce file size and ensure what you see is exactly what you get.</p>
+                <ul>
+                    <li>Permanent crop application</li>
+                    <li>Hidden area removal</li>
+                    <li>File size optimization</li>
+                    <li>WYSIWYG guarantee</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-select-similar.png" alt="Select Similar">
+            </div>
+            <div class="showcase-content">
+                <h3>Select Similar</h3>
+                <p>Instantly select all objects sharing the same attributes. Find and modify elements by fill color, stroke, font, or size with one click.</p>
+                <ul>
+                    <li>Match by fill color</li>
+                    <li>Match by stroke color</li>
+                    <li>Match by font family</li>
+                    <li>Match by font size</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-style-history.png" alt="Style Copy History">
+            </div>
+            <div class="showcase-content">
+                <h3>Style Copy History</h3>
+                <p>Copy formatting from any object and save it to your history. Apply saved styles to new objects anytime during your session.</p>
+                <ul>
+                    <li>One-click style capture</li>
+                    <li>Persistent style history</li>
+                    <li>Quick style application</li>
+                    <li>Multiple style storage</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-grid-duplicate.png" alt="Grid Duplicate">
+            </div>
+            <div class="showcase-content">
+                <h3>Grid Duplicate</h3>
+                <p>Create multiple copies with precise spacing control. Duplicate horizontally, vertically, or in a grid pattern with customizable gaps.</p>
+                <ul>
+                    <li>Horizontal duplication</li>
+                    <li>Vertical duplication</li>
+                    <li>Grid pattern creation</li>
+                    <li>Custom spacing control</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="section-header">
+            <h2>Complete Feature List</h2>
+            <p>All the tools you need, organized in one sidebar.</p>
+        </div>
+
+        <div class="utility-grid">
+            <div class="utility-category">
+                <h3>Image Editing</h3>
+                <ul>
+                    <li>AI Image Extension</li>
+                    <li>AI Upscaling (2x)</li>
+                    <li>Image Effects</li>
+                    <li>Crop Commit</li>
+                    <li>Replace Image</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>Color & Style</h3>
+                <ul>
+                    <li>Visual Color Picker</li>
+                    <li>RGB/HEX Input</li>
+                    <li>Fill & Stroke Colors</li>
+                    <li>Select Similar</li>
+                    <li>Style Copy History</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>Layout & Position</h3>
+                <ul>
+                    <li>6-Direction Alignment</li>
+                    <li>Distribute Spacing</li>
+                    <li>X/Y Coordinates</li>
+                    <li>Grid Duplicate</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>Size & Transform</h3>
+                <ul>
+                    <li>Width/Height Input</li>
+                    <li>Aspect Ratio Lock</li>
+                    <li>Preset Ratios</li>
+                    <li>Rotation & Flip</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="utility-benefit">
+            <p><strong>No more switching between apps.</strong> Everything you need is right in your sidebar — faster workflow, consistent results.</p>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <h2>Ready to upgrade your presentations?</h2>
+        <p>Install Designer's Palette for free and start creating.</p>
+        <a href="https://workspace.google.com/marketplace/" class="cta-btn">Get Started</a>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="support.html">Support</a>
+            <a href="privacy-policy.html">Privacy Policy</a>
+            <a href="terms-of-service.html">Terms of Service</a>
+        </div>
+        <div class="footer-copy">
+            <p>© 2025 Haruniko Inc.</p>
+            <p>Google Slides™ is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題を報告 - Designer's Palette</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-alt: #fafafa;
+            --border: #e0e0e0;
+            --error: #d93025;
+            --success: #1e8e3e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            font-size: 18px;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 0 40px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .nav-brand-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .nav-brand-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        .nav-links a.active {
+            color: var(--text);
+        }
+
+        .content {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 120px 40px 80px;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 48px;
+        }
+
+        .form-group { margin-bottom: 24px; }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        label .required { color: var(--error); }
+
+        input[type="text"], input[type="email"], textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        textarea { min-height: 150px; resize: vertical; }
+
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 12px; }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .checkbox-item input { width: 16px; height: 16px; }
+
+        .submit-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover { background: #1557b0; }
+        .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .message {
+            display: none;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+        }
+
+        .message.success { background: #e6f4ea; border: 1px solid var(--success); color: var(--success); }
+        .message.error { background: #fce8e6; border: 1px solid var(--error); color: var(--error); }
+
+        .info-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            margin-top: 80px;
+        }
+
+        .footer-links {
+            margin-bottom: 24px;
+        }
+
+        .footer-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 16px;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .footer-copy p {
+            margin: 4px 0;
+        }
+
+        @media (max-width: 600px) {
+            .nav { padding: 0 20px; }
+            .nav-links { gap: 16px; }
+            .nav-links a { font-size: 13px; }
+            .content { padding: 100px 20px 60px; }
+            h1 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="index-ja.html" class="nav-brand">
+                <span class="nav-brand-title">Designer's Palette</span>
+                <span class="nav-brand-sub">FOR GOOGLE SLIDES™</span>
+            </a>
+            <div class="nav-links">
+                <a href="index-ja.html">TOP</a>
+                <a href="support-ja.html">サポート</a>
+                <a href="privacy-policy-ja.html">プライバシー</a>
+                <a href="terms-of-service-ja.html">利用規約</a>
+                <a href="feedback-ja.html" class="active">問題を報告</a>
+                <a href="feedback.html">English</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <h1>問題を報告</h1>
+        <p class="subtitle">バグの報告や機能のリクエストをお送りください。</p>
+
+        <div class="message success" id="successMsg">ありがとうございます！フィードバックを受け付けました。</div>
+        <div class="message error" id="errorMsg">送信に失敗しました。もう一度お試しください。</div>
+
+        <div class="info-box">
+            すべての報告は自動的に記録され、開発チームがレビューします。
+        </div>
+
+        <form id="feedbackForm">
+            <div class="form-group">
+                <label>問題の種類 <span class="required">*</span></label>
+                <select name="issueType" required>
+                    <option value="">選択してください...</option>
+                    <option value="bug">バグ報告</option>
+                    <option value="feature">機能リクエスト</option>
+                    <option value="performance">パフォーマンスの問題</option>
+                    <option value="ui">UI/UXの問題</option>
+                    <option value="other">その他</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>関連する機能</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="crop"> トリミング確定</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="extend"> AI画像拡張</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="upscale"> AI高画質化</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="color"> 色調補正</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="effect"> エフェクト</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="palette"> カラーパレット</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="stroke"> 枠線</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="text"> テキスト書式</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="align"> 整列</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="shape"> 図形</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="duplicate"> 複製</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="order"> 重ね順</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="group"> グループ化</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="similar"> 共通選択</label>
+                    <label class="checkbox-item"><input type="checkbox" name="feature" value="style-history"> 書式履歴</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="description">詳細説明 <span class="required">*</span></label>
+                <textarea name="description" id="description" placeholder="問題の詳細を教えてください..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="expected">期待する動作</label>
+                <textarea name="expected" id="expected" placeholder="どのような動作を期待しましたか？" style="min-height:80px;"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="email">メールアドレス（任意）</label>
+                <input type="email" name="email" id="email" placeholder="your@email.com">
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+        </form>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="index-ja.html">TOP</a>
+            <a href="support-ja.html">サポート</a>
+            <a href="privacy-policy-ja.html">プライバシー</a>
+            <a href="terms-of-service-ja.html">利用規約</a>
+        </div>
+        <div class="footer-copy">
+            <p>© 2025 株式会社ハルニコ</p>
+            <p>Google Slides™ is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Google Apps Script Web App URL
+        const FEEDBACK_ENDPOINT = 'https://script.google.com/macros/s/AKfycbz0FK1CmHIKTSADk-3J_MfjiXOg7Yw7r5DFr-Az3eNvmp0U7aX6O9GYZQP63xGG2UU7/exec';
+
+        document.getElementById('feedbackForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const successMsg = document.getElementById('successMsg');
+            const errorMsg = document.getElementById('errorMsg');
+
+            btn.disabled = true;
+            btn.textContent = '送信中...';
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            const formData = new FormData(this);
+            const features = [];
+            document.querySelectorAll('input[name="feature"]:checked').forEach(cb => features.push(cb.value));
+
+            const data = {
+                timestamp: new Date().toISOString(),
+                issueType: formData.get('issueType'),
+                features: features.join(', '),
+                description: formData.get('description'),
+                expected: formData.get('expected'),
+                email: formData.get('email'),
+                browser: navigator.userAgent,
+                source: 'web-ja'
+            };
+
+            try {
+                await fetch(FEEDBACK_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(data)
+                });
+                successMsg.style.display = 'block';
+                this.reset();
+            } catch (error) {
+                errorMsg.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '送信する';
+            }
+        });
+    </script>
+</body>
+</html>

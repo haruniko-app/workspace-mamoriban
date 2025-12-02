@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Designer's Palette</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-alt: #fafafa;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 18px;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 0 40px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .nav-brand-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .nav-brand-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--text);
+        }
+
+        .content {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 120px 40px 80px;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 48px;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            letter-spacing: -0.2px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .contact-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 32px;
+            margin-bottom: 48px;
+        }
+
+        .contact-box h2 {
+            margin-top: 0;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+            padding: 24px 0;
+        }
+
+        .faq-item:first-of-type {
+            border-top: 1px solid var(--border);
+        }
+
+        .faq-question {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-size: 18px;
+        }
+
+        .faq-answer {
+            color: var(--text-secondary);
+            font-size: 17px;
+        }
+
+        ul {
+            color: var(--text-secondary);
+            padding-left: 20px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            font-size: 17px;
+        }
+
+        .footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            margin-top: 80px;
+        }
+
+        .footer-links {
+            margin-bottom: 24px;
+        }
+
+        .footer-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 16px;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 600px) {
+            .nav { padding: 0 20px; }
+            .nav-links { gap: 16px; }
+            .nav-links a { font-size: 13px; }
+            .content { padding: 100px 20px 60px; }
+            h1 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-brand">
+                <span class="nav-brand-title">Designer's Palette</span>
+                <span class="nav-brand-sub">FOR GOOGLE SLIDES™</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">TOP</a>
+                <a href="support.html" class="active">Support</a>
+                <a href="privacy-policy.html">Privacy</a>
+                <a href="terms-of-service.html">Terms</a>
+                <a href="feedback.html">Feedback</a>
+                <a href="support-ja.html">日本語</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <h1>Support</h1>
+
+        <div class="contact-box">
+            <h2>Contact</h2>
+            <p>If you need help with Designer's Palette for Google Slides™, please contact us:</p>
+            <p><strong>Haruniko Inc.</strong><br>
+            3-5-7 Sekihara, Adachi-ku, Tokyo, Japan<br>
+            Email: info@haruniko.co.jp</p>
+            <p>We typically respond within 1-2 business days.</p>
+        </div>
+
+        <h2>FAQ</h2>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I install the add-on?</div>
+            <p class="faq-answer">Open Google Slides, go to Extensions → Add-ons → Get add-ons. Search for "Designer's Palette" and click Install.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I open the sidebar?</div>
+            <p class="faq-answer">After installation, go to Extensions → Designer's Palette → Open.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">Why are some features grayed out?</div>
+            <p class="faq-answer">Some features require specific elements to be selected. Image editing requires an image, text formatting requires a text box.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do AI features work?</div>
+            <p class="faq-answer">AI features process your image on secure cloud servers and return the result immediately. Original images are not stored.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">What image formats are supported?</div>
+            <p class="faq-answer">PNG, JPEG, GIF, and WebP. For best results with AI features, use high-quality source images.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">Is my data secure?</div>
+            <p class="faq-answer">Yes. Most operations happen locally. AI features use encrypted connections and do not permanently store your data.</p>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I uninstall?</div>
+            <p class="faq-answer">Go to Extensions → Add-ons → Manage add-ons. Find Designer's Palette and select Uninstall.</p>
+        </div>
+
+        <h2>Known Issues</h2>
+        <ul>
+            <li>AI features require an internet connection</li>
+            <li>Very large images (over 10MB) may not be supported</li>
+            <li>Alignment features require at least 2 elements</li>
+        </ul>
+
+        <h2>Tips</h2>
+        <ul>
+            <li>Smaller expansion percentages yield better AI results</li>
+            <li>Use preview before applying changes</li>
+            <li>Hold Shift to select multiple objects</li>
+        </ul>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="index.html">TOP</a>
+            <a href="support.html">Support</a>
+            <a href="privacy-policy.html">Privacy</a>
+            <a href="terms-of-service.html">Terms</a>
+        </div>
+        <div class="footer-copy">
+            <p>© 2025 Haruniko Inc. · Google Slides™ is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

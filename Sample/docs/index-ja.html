@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Designer's Palette for Google Slides™</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-alt: #fafafa;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            font-size: 18px;
+            line-height: 1.8;
+            color: var(--text);
+            background: var(--bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 0 40px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .nav-brand-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.3px;
+        }
+
+        .nav-brand-sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        /* Hero */
+        .hero-section {
+            background: linear-gradient(135deg, rgba(248, 249, 250, 0.6) 0%, rgba(232, 234, 237, 0.6) 100%),
+                        url('images/hero-designer.png');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        .hero {
+            padding: 140px 40px 80px;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-tagline {
+            font-size: 18px;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .hero-tagline-tight {
+            margin-bottom: -8px !important;
+        }
+
+        .hero h1 {
+            font-size: 80px;
+            font-weight: 600;
+            letter-spacing: -2.5px;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .hero-sub {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            letter-spacing: 0.5px;
+        }
+
+        .hero-icon {
+            width: 96px;
+            height: 96px;
+            margin-bottom: 32px;
+            border-radius: 20px;
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 40px;
+            line-height: 1.8;
+        }
+
+        .cta-btn {
+            display: inline-block;
+            padding: 16px 36px;
+            background: var(--text);
+            color: var(--bg);
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: opacity 0.2s;
+        }
+
+        .cta-btn:hover {
+            opacity: 0.8;
+        }
+
+        .section {
+            padding: 70px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 36px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 520px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 60px 40px;
+        }
+
+        .feature {
+            text-align: center;
+        }
+
+        .feature-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 24px;
+            stroke: var(--text);
+            stroke-width: 1.2;
+            fill: none;
+        }
+
+        .feature h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.2px;
+        }
+
+        .feature p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .showcase {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .showcase:first-of-type {
+            border-top: none;
+        }
+
+        .showcase:nth-child(even) {
+            direction: rtl;
+        }
+
+        .showcase:nth-child(even) > * {
+            direction: ltr;
+        }
+
+        .showcase-visual {
+            aspect-ratio: 4/3;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .showcase-visual img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .showcase-content h3 {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .showcase-content p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.8;
+        }
+
+        .showcase-content ul {
+            list-style: none;
+        }
+
+        .showcase-content li {
+            font-size: 16px;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .showcase-content li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: var(--border);
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 0;
+        }
+
+        /* Utility Grid */
+        .utility-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+            margin-bottom: 48px;
+        }
+
+        .utility-category h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .utility-category ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .utility-category li {
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .utility-category li:last-child {
+            border-bottom: none;
+        }
+
+        .utility-benefit {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px 32px;
+            text-align: center;
+        }
+
+        .utility-benefit p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin: 0;
+            line-height: 1.7;
+        }
+
+        .utility-benefit strong {
+            color: var(--text);
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 80px 40px;
+            background: var(--bg-alt);
+        }
+
+        .cta-section h2 {
+            font-size: 32px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .cta-section p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-links {
+            margin-bottom: 24px;
+        }
+
+        .footer-links a {
+            font-size: 15px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 16px;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        .footer-copy {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .footer-copy p {
+            margin: 4px 0;
+        }
+
+        @media (max-width: 900px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .showcase {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            .showcase:nth-child(even) {
+                direction: ltr;
+            }
+            .utility-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .nav { padding: 0 20px; }
+            .nav-links { gap: 16px; }
+            .nav-links a { font-size: 12px; }
+            .hero { padding: 140px 20px 80px; }
+            .hero h1 { font-size: 48px; }
+            .hero p { font-size: 16px; }
+            .section { padding: 60px 20px; }
+            .section-header { margin-bottom: 48px; }
+            .section-header h2 { font-size: 24px; }
+            .features-grid { grid-template-columns: 1fr; gap: 40px; }
+            .utility-grid { grid-template-columns: 1fr; }
+            .utility-benefit { padding: 20px; }
+            .cta-section { padding: 80px 20px; }
+            .pain-points-grid { grid-template-columns: 1fr !important; }
+        }
+
+        @media (max-width: 900px) {
+            .pain-points-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="index-ja.html" class="nav-brand">
+                <span class="nav-brand-title">Designer's Palette</span>
+                <span class="nav-brand-sub">FOR GOOGLE SLIDES™</span>
+            </a>
+            <div class="nav-links">
+                <a href="index-ja.html">TOP</a>
+                <a href="support-ja.html">サポート</a>
+                <a href="privacy-policy-ja.html">プライバシー</a>
+                <a href="terms-of-service-ja.html">利用規約</a>
+                <a href="feedback-ja.html">問題を報告</a>
+                <a href="index.html">English</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero-section">
+        <section class="hero">
+            <p class="hero-tagline hero-tagline-tight">デザイナーによる、デザイナーのための、AIデザインツール。</p>
+            <h1>Designer's Palette</h1>
+            <p class="hero-sub">FOR GOOGLE SLIDES™</p>
+            <img src="icon.png" alt="Designer's Palette" class="hero-icon">
+            <p>プレゼンテーションのためのプロフェッショナルデザインツール。AI画像編集、精密な整列、高度なカラー管理。</p>
+            <a href="https://workspace.google.com/marketplace/" class="cta-btn">無料でインストール</a>
+        </section>
+    </div>
+
+    <!-- Pain Points Section -->
+    <section style="background: var(--bg-alt); padding: 80px 0;">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 40px;">
+            <div class="section-header">
+                <h2>Google スライドに足りないもの</h2>
+                <p style="font-size: 22px; font-weight: 600; color: var(--text);">こんな経験、ありませんか？</p>
+            </div>
+            <div class="pain-points-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1000px; margin: 0 auto;">
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「画像のサイズが足りない...外部ツールで拡張するしかないのか」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「低解像度の画像しかない...引き伸ばすとぼやけてしまう」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「この色と同じオブジェクトを全部選択したいのに、一つずつクリック...」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「要素を等間隔に並べたいけど、ガイドがないから目分量...」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「書式のコピペが面倒...何度も同じ作業を繰り返している」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+                <div class="speech-bubble" style="background: var(--bg); border-radius: 16px; padding: 24px 28px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <p style="font-size: 17px; color: var(--text); line-height: 1.7; margin: 0;">
+                        「トリミングしたはずなのに、共有したら元の画像が見えた...」
+                    </p>
+                    <div style="position: absolute; bottom: -10px; left: 24px; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid var(--bg);"></div>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 56px; font-size: 18px; color: var(--text);">
+                <strong>Designer's Palette</strong> は、これらすべてを解決します。
+            </p>
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="section-header">
+            <h2>オールインワン デザインパレット</h2>
+            <p>プロフェッショナルなプレゼンテーションに必要なすべてを、ひとつのサイドバーに。</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="16" y="16" width="16" height="16" rx="2" fill="none"/>
+                    <rect x="4" y="4" width="40" height="40" rx="2" stroke-dasharray="4 2" fill="none"/>
+                    <!-- 8方向の矢印 -->
+                    <path d="M24 14V6M24 6l-3 3M24 6l3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M24 34v8M24 42l-3-3M24 42l3-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M14 24H6M6 24l3-3M6 24l3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M34 24h8M42 24l-3-3M42 24l-3 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M17 17l-6-6M11 11l3 0M11 11l0 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M31 17l6-6M37 11l-3 0M37 11l0 3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M17 31l-6 6M11 37l3 0M11 37l0-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M31 31l6 6M37 37l-3 0M37 37l0-3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                <h3>AI画像拡張</h3>
+                <p>生成AIで画像の周囲を自然に描き足して拡張します。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="14" y="14" width="10" height="10" rx="1"/>
+                    <rect x="24" y="4" width="20" height="20" rx="2"/>
+                    <path d="M20 24l4 4" stroke-linecap="round"/>
+                    <path d="M28 12l8 8M32 12l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h3>AI高画質化</h3>
+                <p>低解像度の画像をAIで2倍に高解像度化・鮮明化。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="36" height="28" rx="2"/>
+                    <circle cx="24" cy="20" r="8" opacity="0.3"/>
+                    <circle cx="24" cy="20" r="5" opacity="0.5"/>
+                    <circle cx="24" cy="20" r="2" fill="currentColor"/>
+                    <path d="M10 40h28M14 44h20" opacity="0.5"/>
+                </svg>
+                <h3>画像エフェクト</h3>
+                <p>ぼかし、グレースケール、セピアなどのエフェクトをSlides上で直接適用。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="32" height="24" rx="2"/>
+                    <path d="M8 26l8-8 6 6 8-10 10 12"/>
+                    <line x1="8" y1="38" x2="40" y2="38"/>
+                    <line x1="8" y1="43" x2="28" y2="43"/>
+                </svg>
+                <h3>トリミング確定</h3>
+                <p>クロップ範囲を確定し、隠れた部分を完全に削除。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="10" width="14" height="14" rx="2"/>
+                    <rect x="28" y="10" width="14" height="14" rx="2"/>
+                    <rect x="6" y="32" width="14" height="10" rx="2"/>
+                    <rect x="28" y="28" width="14" height="14" rx="2"/>
+                    <circle cx="13" cy="17" r="3" fill="currentColor"/>
+                    <circle cx="35" cy="17" r="3" fill="currentColor"/>
+                    <path d="M24 17v14M13 27v5M35 27v1" stroke-dasharray="2 2"/>
+                </svg>
+                <h3>共通選択</h3>
+                <p>同じ塗り色・枠線・フォントのオブジェクトをワンクリックで一括選択。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="8" width="16" height="16" rx="2"/>
+                    <rect x="26" y="8" width="16" height="16" rx="2" stroke-dasharray="3 2"/>
+                    <path d="M14 16h-4v4M14 12v-4h-4"/>
+                    <rect x="6" y="32" width="36" height="8" rx="2"/>
+                    <circle cx="14" cy="36" r="2" fill="currentColor"/>
+                    <circle cx="24" cy="36" r="2" fill="currentColor"/>
+                    <circle cx="34" cy="36" r="2" fill="currentColor"/>
+                </svg>
+                <h3>スタイルコピー履歴</h3>
+                <p>書式をコピーして履歴から適用。スタイルを簡単に再利用。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="10" height="10" rx="1"/>
+                    <rect x="19" y="6" width="10" height="10" rx="1"/>
+                    <rect x="32" y="6" width="10" height="10" rx="1"/>
+                    <rect x="6" y="19" width="10" height="10" rx="1"/>
+                    <rect x="19" y="19" width="10" height="10" rx="1"/>
+                    <rect x="32" y="19" width="10" height="10" rx="1"/>
+                    <rect x="6" y="32" width="10" height="10" rx="1"/>
+                    <rect x="19" y="32" width="10" height="10" rx="1"/>
+                    <rect x="32" y="32" width="10" height="10" rx="1"/>
+                </svg>
+                <h3>連続複製</h3>
+                <p>水平・垂直・グリッド状に、間隔を指定して連続コピー。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="4" y="4" width="18" height="18" rx="2"/>
+                    <rect x="26" y="4" width="18" height="18" rx="2"/>
+                    <rect x="4" y="26" width="18" height="18" rx="2"/>
+                    <circle cx="13" cy="13" r="5"/>
+                    <path d="M31 9h8M35 9v8" stroke-linecap="round"/>
+                    <path d="M9 31h8M9 35h8M9 39h8"/>
+                </svg>
+                <h3>カラー＆整列</h3>
+                <p>ビジュアルカラーピッカー、RGBスライダー、6方向整列、精密な間隔設定。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                    <path d="M8 20h32M20 8v32"/>
+                    <circle cx="14" cy="14" r="2" fill="currentColor"/>
+                    <path d="M26 14h8M26 26h8M26 34h8"/>
+                </svg>
+                <h3>サイズ＆変形</h3>
+                <p>正確な寸法指定、アスペクト比ロック、回転、反転、プリセット比率。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <path d="M8 12h32M8 24h24M8 36h28"/>
+                    <rect x="6" y="10" width="4" height="4" rx="1" fill="currentColor"/>
+                    <rect x="6" y="22" width="4" height="4" rx="1" fill="currentColor"/>
+                    <rect x="6" y="34" width="4" height="4" rx="1" fill="currentColor"/>
+                    <path d="M38 30v12M32 36h12" stroke-linecap="round"/>
+                </svg>
+                <h3>テキスト＆レイヤー</h3>
+                <p>フォント設定、行間調整、グループ化、レイヤー順序を一箇所で管理。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="6" y="6" width="36" height="36" rx="2" stroke-dasharray="4 2"/>
+                    <circle cx="24" cy="24" r="3" fill="currentColor"/>
+                    <path d="M24 8v8M24 32v8M8 24h8M32 24h8" stroke-linecap="round"/>
+                    <path d="M12 12l6 6M30 30l6 6M12 36l6-6M30 18l6-6" opacity="0.5"/>
+                </svg>
+                <h3>位置＆座標</h3>
+                <p>X/Y座標を正確に指定し、ピクセル単位で配置。</p>
+            </div>
+
+            <div class="feature">
+                <svg class="feature-icon" viewBox="0 0 48 48">
+                    <rect x="8" y="8" width="24" height="32" rx="2"/>
+                    <path d="M14 16h12M14 22h8M14 28h10"/>
+                    <path d="M36 20l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M32 26h10" stroke-linecap="round"/>
+                </svg>
+                <h3>エクスポート</h3>
+                <p>スライドや選択要素をPNG、JPG、PDFで高品質出力。</p>
+            </div>
+
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-ai-extension.png" alt="AI画像拡張">
+            </div>
+            <div class="showcase-content">
+                <h3>AI画像拡張</h3>
+                <p>画像を任意の方向にシームレスに拡張。AIがオリジナルと完璧にブレンドするコンテンツを生成します。</p>
+                <ul>
+                    <li>任意の方向に拡張</li>
+                    <li>シームレスなブレンド</li>
+                    <li>拡張率の調整可能</li>
+                    <li>高速クラウド処理</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-ai-upscaling.png" alt="AI高画質化">
+            </div>
+            <div class="showcase-content">
+                <h3>AI高画質化</h3>
+                <p>低解像度の画像を鮮明で高品質なバージョンに変換。AIがディテールを強化し、エッジをシャープに補正します。</p>
+                <ul>
+                    <li>2倍の解像度向上</li>
+                    <li>ディテールの保持</li>
+                    <li>エッジのシャープ化</li>
+                    <li>自然な仕上がり</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-image-effects.png" alt="画像エフェクト">
+            </div>
+            <div class="showcase-content">
+                <h3>画像エフェクト</h3>
+                <p>Google Slides上で直接プロフェッショナルな画像エフェクトを適用。ぼかし、カラーエフェクトで画像を変換 — 外部エディタは不要です。</p>
+                <ul>
+                    <li>ぼかし・モザイクフィルター</li>
+                    <li>グレースケール・セピア調</li>
+                    <li>明るさ・コントラスト調整</li>
+                    <li>周辺減光エフェクト</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-crop-commit.png" alt="トリミング確定">
+            </div>
+            <div class="showcase-content">
+                <h3>トリミング確定</h3>
+                <p>画像のクロップを永続的に確定。隠れた領域を削除してファイルサイズを最適化し、見た目通りの結果を保証します。</p>
+                <ul>
+                    <li>クロップの永続的適用</li>
+                    <li>隠れた領域の削除</li>
+                    <li>ファイルサイズ最適化</li>
+                    <li>表示通りの結果保証</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-select-similar.png" alt="共通選択">
+            </div>
+            <div class="showcase-content">
+                <h3>共通選択</h3>
+                <p>同じ属性を持つすべてのオブジェクトを瞬時に選択。塗り色、枠線、フォント、サイズでワンクリック検索・変更。</p>
+                <ul>
+                    <li>塗り色でマッチング</li>
+                    <li>枠線色でマッチング</li>
+                    <li>フォントでマッチング</li>
+                    <li>フォントサイズでマッチング</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-style-history.png" alt="スタイルコピー履歴">
+            </div>
+            <div class="showcase-content">
+                <h3>スタイルコピー履歴</h3>
+                <p>任意のオブジェクトから書式をコピーして履歴に保存。保存したスタイルをセッション中いつでも新しいオブジェクトに適用。</p>
+                <ul>
+                    <li>ワンクリックでスタイル取得</li>
+                    <li>スタイル履歴の保持</li>
+                    <li>素早いスタイル適用</li>
+                    <li>複数スタイルの保存</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="showcase">
+            <div class="showcase-visual">
+                <img src="images/feature-grid-duplicate.png" alt="連続複製">
+            </div>
+            <div class="showcase-content">
+                <h3>連続複製</h3>
+                <p>正確な間隔指定で複数コピーを作成。水平、垂直、またはグリッドパターンでカスタマイズ可能な間隔で複製。</p>
+                <ul>
+                    <li>水平方向の複製</li>
+                    <li>垂直方向の複製</li>
+                    <li>グリッドパターン作成</li>
+                    <li>カスタム間隔設定</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <hr class="divider">
+
+    <section class="section">
+        <div class="section-header">
+            <h2>全機能一覧</h2>
+            <p>必要なツールすべてを、ひとつのサイドバーに整理。</p>
+        </div>
+
+        <div class="utility-grid">
+            <div class="utility-category">
+                <h3>画像編集</h3>
+                <ul>
+                    <li>AI画像拡張</li>
+                    <li>AI高画質化（2倍）</li>
+                    <li>画像エフェクト</li>
+                    <li>トリミング確定</li>
+                    <li>画像の置換</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>カラー＆スタイル</h3>
+                <ul>
+                    <li>ビジュアルカラーピッカー</li>
+                    <li>RGB/HEX入力</li>
+                    <li>塗り＆枠線カラー</li>
+                    <li>共通選択</li>
+                    <li>スタイルコピー履歴</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>レイアウト＆位置</h3>
+                <ul>
+                    <li>6方向整列</li>
+                    <li>等間隔配置</li>
+                    <li>X/Y座標指定</li>
+                    <li>連続複製</li>
+                </ul>
+            </div>
+            <div class="utility-category">
+                <h3>サイズ＆変形</h3>
+                <ul>
+                    <li>幅/高さ指定</li>
+                    <li>アスペクト比ロック</li>
+                    <li>プリセット比率</li>
+                    <li>回転＆反転</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="utility-benefit">
+            <p><strong>アプリを切り替える必要はもうありません。</strong>必要なものすべてがサイドバーに — より速いワークフロー、一貫した結果。</p>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <h2>プレゼンテーションをアップグレードする準備はできましたか？</h2>
+        <p>Designer's Paletteを無料でインストールして、今すぐ作成を始めましょう。</p>
+        <a href="https://workspace.google.com/marketplace/" class="cta-btn">始める</a>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="support-ja.html">サポート</a>
+            <a href="privacy-policy-ja.html">プライバシーポリシー</a>
+            <a href="terms-of-service-ja.html">利用規約</a>
+        </div>
+        <div class="footer-copy">
+            <p>© 2025 株式会社ハルニコ</p>
+            <p>Google Slides™ is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
