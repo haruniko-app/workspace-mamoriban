@@ -112,16 +112,53 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
+// 検索可能な機能リスト
+const searchableFeatures = [
+  { name: 'ダッシュボード', description: 'セキュリティ状況の概要', href: '/dashboard', keywords: ['ダッシュボード', 'ホーム', '概要', 'dashboard'] },
+  { name: '新規スキャン', description: 'Google Driveをスキャン', href: '/scan', keywords: ['スキャン', '検査', 'scan', '実行'] },
+  { name: 'ファイル一覧', description: 'スキャン結果のファイル', href: '/scan', keywords: ['ファイル', 'リスク', 'file', '結果'] },
+  { name: '監査ログ', description: 'アクティビティログ', href: '/audit-logs', keywords: ['監査', 'ログ', 'audit', '履歴'] },
+  { name: '組織管理', description: 'メンバー・権限管理', href: '/organization', keywords: ['組織', 'メンバー', 'organization', 'チーム'] },
+  { name: '設定', description: 'アカウント設定', href: '/settings', keywords: ['設定', 'アカウント', 'settings', '環境'] },
+  { name: '管理者ダッシュボード', description: '管理者向け統計', href: '/admin', keywords: ['管理者', 'admin', '統計', '分析'], admin: true },
+  { name: 'ISMS/Pマークレポート', description: '監査対応レポート出力', href: '/reports', keywords: ['レポート', 'ISMS', 'Pマーク', 'PDF', '出力'], admin: true },
+  { name: '通知設定', description: 'アラート・通知管理', href: '/notifications', keywords: ['通知', 'アラート', 'notification', 'メール'], admin: true },
+  { name: '統合スキャン設定', description: '組織全体のスキャン', href: '/delegation', keywords: ['統合', 'delegation', '委任', '全体'], admin: true },
+];
+
 export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // ユーザーのロールに応じてナビゲーションを構築
   const isAdmin = user?.role === 'admin' || user?.role === 'owner';
   const navigation = isAdmin ? [...baseNavigation, ...adminNavigation] : baseNavigation;
+
+  // 検索結果のフィルタリング
+  const filteredFeatures = searchQuery.trim()
+    ? searchableFeatures
+        .filter((feature) => {
+          if (feature.admin && !isAdmin) return false;
+          const query = searchQuery.toLowerCase();
+          return (
+            feature.name.toLowerCase().includes(query) ||
+            feature.description.toLowerCase().includes(query) ||
+            feature.keywords.some((k) => k.toLowerCase().includes(query))
+          );
+        })
+        .slice(0, 6)
+    : [];
+
+  const handleFeatureClick = (href: string) => {
+    navigate(href);
+    setSearchQuery('');
+    setSearchFocused(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
@@ -152,10 +189,10 @@ export function Layout({ children }: LayoutProps) {
           </Link>
         </div>
 
-        {/* Center - Search bar (Google Drive: max-width 720px, height 46px) */}
+        {/* Center - Feature Search bar */}
         <div className="flex-1 max-w-[720px] mx-auto px-4 hidden md:block">
           <div className="relative">
-            <div className="flex items-center h-[46px] bg-[#f1f3f4] rounded-full hover:bg-white hover:shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] focus-within:bg-white focus-within:shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] transition-all">
+            <div className={`flex items-center h-[46px] bg-[#f1f3f4] rounded-full hover:bg-white hover:shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] transition-all ${searchFocused ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.24)] rounded-b-none rounded-t-2xl' : ''}`}>
               <div className="pl-3 pr-1 flex items-center">
                 <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
@@ -163,15 +200,85 @@ export function Layout({ children }: LayoutProps) {
               </div>
               <input
                 type="text"
-                placeholder="ファイルを検索"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                placeholder="機能を検索..."
                 className="flex-1 h-full bg-transparent border-0 text-[16px] text-[#202124] placeholder-[#5f6368] outline-none"
               />
-              <button className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-[#e8eaed] transition-colors" title="検索オプション">
-                <svg className="w-6 h-6 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" />
-                </svg>
-              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#e8eaed] transition-colors"
+                  title="クリア"
+                >
+                  <svg className="w-5 h-5 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </svg>
+                </button>
+              )}
             </div>
+
+            {/* Search Suggestions Dropdown */}
+            {searchFocused && (
+              <div className="absolute top-[46px] left-0 right-0 bg-white rounded-b-2xl shadow-[0_4px_8px_rgba(0,0,0,0.16)] border-t border-[#e8eaed] z-50 overflow-hidden">
+                {filteredFeatures.length > 0 ? (
+                  <div className="py-2">
+                    {filteredFeatures.map((feature) => (
+                      <button
+                        key={feature.href + feature.name}
+                        onClick={() => handleFeatureClick(feature.href)}
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#f1f3f4] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#e8f0fe] flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[#1a73e8]" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[#202124] truncate">{feature.name}</p>
+                          <p className="text-xs text-[#5f6368] truncate">{feature.description}</p>
+                        </div>
+                        {feature.admin && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-[#fef7e0] text-[#b06000] rounded font-medium">
+                            管理者
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : searchQuery.trim() ? (
+                  <div className="py-6 text-center">
+                    <p className="text-sm text-[#5f6368]">「{searchQuery}」に一致する機能がありません</p>
+                  </div>
+                ) : (
+                  <div className="py-2">
+                    <p className="px-4 py-2 text-xs text-[#5f6368] font-medium">よく使う機能</p>
+                    {searchableFeatures
+                      .filter((f) => !f.admin || isAdmin)
+                      .slice(0, 4)
+                      .map((feature) => (
+                        <button
+                          key={feature.href + feature.name}
+                          onClick={() => handleFeatureClick(feature.href)}
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#f1f3f4] transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[#f1f3f4] flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-[#5f6368]" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#202124] truncate">{feature.name}</p>
+                            <p className="text-xs text-[#5f6368] truncate">{feature.description}</p>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
