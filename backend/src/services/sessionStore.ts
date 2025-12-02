@@ -46,8 +46,10 @@ export class FirestoreSessionStore extends session.Store {
     const expires = sessionData.cookie?.expires
       ? new Date(sessionData.cookie.expires).toISOString()
       : null;
+    // Convert session to plain object (Firestore doesn't support objects with custom prototypes)
+    const plainSession = JSON.parse(JSON.stringify(sessionData));
     this.db.collection(this.collectionName).doc(sid).set({
-      session: sessionData,
+      session: plainSession,
       expires,
       updatedAt: new Date().toISOString(),
     })
@@ -69,9 +71,11 @@ export class FirestoreSessionStore extends session.Store {
     const expires = sessionData.cookie?.expires
       ? new Date(sessionData.cookie.expires).toISOString()
       : null;
+    // Convert cookie to plain object
+    const plainCookie = JSON.parse(JSON.stringify(sessionData.cookie));
     this.db.collection(this.collectionName).doc(sid).update({
       expires,
-      'session.cookie': sessionData.cookie,
+      'session.cookie': plainCookie,
       updatedAt: new Date().toISOString(),
     })
       .then(() => callback?.())
