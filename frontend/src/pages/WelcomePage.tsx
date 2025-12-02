@@ -6,25 +6,25 @@ export function WelcomePage() {
   const domain = user?.email.split('@')[1] || '';
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Simple header */}
-      <header className="p-6">
-        <div className="flex items-center gap-2">
-          <svg className="w-8 h-8" viewBox="0 0 48 48" fill="none">
-            <rect width="48" height="48" rx="8" fill="#1a73e8" />
-            <path
-              d="M24 8L12 15v13c0 8.4 5.1 16.3 12 18.5 6.9-2.2 12-10.1 12-18.5V15l-12-7z"
-              fill="white"
-            />
-            <path
-              d="M20 24l3 3 6-6"
-              stroke="#1a73e8"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span className="text-[22px] text-[#5f6368]">Workspace守り番</span>
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex flex-col">
+      {/* Header */}
+      <header className="px-6 py-4 bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-gray-800">Workspace</span>
+              <span className="text-xl text-blue-600 font-bold">守り番</span>
+            </div>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
+            <Link to="/privacy" className="hover:text-blue-600 transition-colors">プライバシー</Link>
+            <Link to="/terms" className="hover:text-blue-600 transition-colors">利用規約</Link>
+          </nav>
         </div>
       </header>
 
@@ -127,17 +127,28 @@ export function WelcomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="p-6 flex flex-wrap items-center justify-between gap-4 text-[12px] text-[#5f6368] border-t border-[#dadce0]">
-        <div className="flex items-center gap-1">
-          <span>日本語</span>
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 10l5 5 5-5z" />
-          </svg>
-        </div>
-        <div className="flex items-center gap-6">
-          <a href="#" className="hover:text-[#202124]">ヘルプ</a>
-          <a href="#" className="hover:text-[#202124]">プライバシー</a>
-          <a href="#" className="hover:text-[#202124]">利用規約</a>
+      <footer className="bg-gray-900 text-gray-400 py-12">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <span className="text-white font-bold">Workspace守り番</span>
+            </div>
+            <div className="flex items-center gap-6 text-sm">
+              <Link to="/privacy" className="hover:text-white transition-colors">プライバシーポリシー</Link>
+              <Link to="/terms" className="hover:text-white transition-colors">利用規約</Link>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-sm">
+            <p className="mb-2">&copy; 2025 株式会社ハルニコ</p>
+            <p className="text-xs text-gray-500">
+              Google Workspace、Google Drive、Gmail は Google LLC の商標です。本サービスは Google LLC が提供・承認するものではありません。
+            </p>
+          </div>
         </div>
       </footer>
     </div>
