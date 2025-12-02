@@ -19,8 +19,10 @@ export function TermsPage() {
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
             <Link to="/" className="hover:text-blue-600 transition-colors">TOP</Link>
-            <Link to="/privacy" className="hover:text-blue-600 transition-colors">プライバシー</Link>
+            <Link to="/#features" className="hover:text-blue-600 transition-colors">機能</Link>
+            <Link to="/#security" className="hover:text-blue-600 transition-colors">安心設計</Link>
             <Link to="/terms" className="text-blue-600 font-medium">利用規約</Link>
+            <Link to="/privacy" className="hover:text-blue-600 transition-colors">プライバシー</Link>
           </nav>
         </div>
       </header>
