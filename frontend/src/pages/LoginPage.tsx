@@ -91,11 +91,11 @@ export function LoginPage() {
             </svg>
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-6 pt-12 pb-44">
+          <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-44">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left - Text Content */}
               <div className="text-white">
-                <h1 className="text-4xl md:text-5xl font-bold leading-snug md:leading-tight mb-6">
+                <h1 className="text-4xl md:text-7xl font-bold leading-snug md:leading-tight mb-6">
                   Google Drive™ の<br />
                   <span className="text-yellow-300">共有リスク</span>を<br />
                   5分で可視化
