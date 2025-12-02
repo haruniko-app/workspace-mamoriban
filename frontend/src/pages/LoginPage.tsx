@@ -51,6 +51,16 @@ export function LoginPage() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
             <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              TOP
+            </a>
+            <a
               href="#features"
               onClick={(e) => {
                 e.preventDefault();
@@ -71,6 +81,7 @@ export function LoginPage() {
               安心設計
             </a>
             <Link to="/terms" className="hover:text-blue-600 transition-colors">利用規約</Link>
+            <Link to="/privacy" className="hover:text-blue-600 transition-colors">プライバシー</Link>
           </nav>
         </div>
       </header>
